@@ -1,3 +1,5 @@
+import { memo } from 'react'
+
 type StatusTone = 'normal' | 'warning' | 'critical' | 'neutral'
 
 interface StatusBadgeProps {
@@ -14,4 +16,4 @@ function StatusBadge({ label, tone = 'neutral' }: StatusBadgeProps) {
   )
 }
 
-export default StatusBadge
+export default memo(StatusBadge)

@@ -31,9 +31,9 @@ function App() {
           <p className="brand-panel__kicker">Industrial IO-Link Monitor</p>
           <h1 className="brand-panel__title">ICE2 Nexus</h1>
           <p className="brand-panel__body">
-            Simulator-first today, hardware-ready tomorrow. This shell is built
-            to expand into ISDU, MQTT, AI diagnostics, and a broader industrial
-            operations interface.
+            A simulator-first operations shell with production-style UX. The
+            architecture is ready for real ICE2 hardware, ISDU workflows, MQTT
+            telemetry, AI diagnostics, and a broader operator workspace.
           </p>
         </div>
 
@@ -58,8 +58,8 @@ function App() {
         </nav>
 
         <div className="sidebar-note">
-          Phase 1 focuses on the PDI dashboard while keeping the structure ready
-          for multi-page navigation and future operator tooling.
+          Phase 1 keeps the focus on live PDI monitoring while the shell and
+          navigation stay ready for future industrial control-center pages.
         </div>
       </aside>
 

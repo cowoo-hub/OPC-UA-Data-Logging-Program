@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react'
 
 import type { ByteOrder, DecodeSettings, DecodeType, WordOrder } from '../api/types'
+import StatusBadge from './StatusBadge'
 
 interface DecodeControlsProps {
   value: DecodeSettings
@@ -46,14 +47,21 @@ function DecodeControls({
       <div className="control-panel__header">
         <div>
           <p className="section-kicker">Decode preview</p>
-          <h2 className="section-title">First-register decode controls</h2>
+          <h2 className="section-title">Global payload decode profile</h2>
         </div>
-        <p className="control-panel__hint">
-          Byte order is applied client-side before the current backend
-          <code>/convert</code> call, so the UI already behaves like the future
-          backend contract.
-        </p>
+        <div className="control-panel__status-stack">
+          <StatusBadge label={value.dataType} tone="normal" />
+          <StatusBadge label={`${value.wordOrder} words`} tone="neutral" />
+          <StatusBadge label={`${value.byteOrder} bytes`} tone="neutral" />
+        </div>
       </div>
+
+      <p className="control-panel__hint">
+        The selected decode becomes the featured preview for every port card.
+        Float32, UInt32, Int32, and binary views remain visible underneath for
+        side-by-side comparison. Byte order is applied client-side before the
+        existing backend <code>/convert</code> call.
+      </p>
 
       <div className="control-grid">
         <label className="control-field">

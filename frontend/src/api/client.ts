@@ -66,8 +66,10 @@ function swapRegisterBytes(registerValue: number): number {
 function buildConvertPayload(
   registers: number[],
   settings: DecodeSettings,
+  overrideType?: DecodeType,
 ): ConvertRequest {
-  const selectedRegisters = registers.slice(0, getRegistersNeeded(settings.dataType))
+  const decodeType = overrideType ?? settings.dataType
+  const selectedRegisters = registers.slice(0, getRegistersNeeded(decodeType))
   const byteAdjustedRegisters =
     settings.byteOrder === 'little'
       ? selectedRegisters.map(swapRegisterBytes)
@@ -75,10 +77,9 @@ function buildConvertPayload(
 
   return {
     registers: byteAdjustedRegisters,
-    data_type: settings.dataType,
+    data_type: decodeType,
     word_order: settings.wordOrder,
-    word_length:
-      settings.dataType === 'binary' ? byteAdjustedRegisters.length : undefined,
+    word_length: decodeType === 'binary' ? byteAdjustedRegisters.length : undefined,
   }
 }
 
@@ -99,10 +100,6 @@ export async function connectTarget(
   })
 }
 
-export async function ensureSimulatorConnection(): Promise<ConnectResponse> {
-  return connectTarget(DEFAULT_SIMULATOR_CONNECT_REQUEST)
-}
-
 export async function fetchPortPdi(portNumber: number): Promise<PdiResponse> {
   return request<PdiResponse>(`/ports/${portNumber}/pdi`)
 }
@@ -119,6 +116,7 @@ export async function convertRegisters(
 export async function fetchDecodedPreview(
   registers: number[],
   settings: DecodeSettings,
+  overrideType?: DecodeType,
 ): Promise<ConvertResponse> {
-  return convertRegisters(buildConvertPayload(registers, settings))
+  return convertRegisters(buildConvertPayload(registers, settings, overrideType))
 }

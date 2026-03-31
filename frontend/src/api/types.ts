@@ -119,6 +119,12 @@ export interface DecodeSettings {
   byteOrder: ByteOrder
 }
 
+export interface ConnectionDraft {
+  host: string
+  port: string
+  slaveId: string
+}
+
 export interface DecodedPreview {
   displayValue: string
   rawValue: number | string | null
@@ -126,10 +132,18 @@ export interface DecodedPreview {
   error: string | null
 }
 
+export interface PortDecodeCollection {
+  featured: DecodedPreview
+  float32: DecodedPreview
+  uint32: DecodedPreview
+  int32: DecodedPreview
+  binary: DecodedPreview
+}
+
 export interface PortSnapshot {
   portNumber: number
   severity: PortSeverity
   pdi: PdiResponse | null
-  decoded: DecodedPreview | null
+  decodes: PortDecodeCollection | null
   error: string | null
 }
