@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import CommandStrip from './components/CommandStrip'
-import KpiBar from './components/KpiBar'
+import ConnectionBar from './components/ConnectionBar'
 import { useMonitoringWorkspaceContext } from './context/MonitoringWorkspaceContext'
 import { MonitoringWorkspaceProvider } from './context/MonitoringWorkspaceProvider'
+import AIDiagnosticsPage from './pages/AIDiagnosticsPage'
+import IODDLibraryPage from './pages/IODDLibraryPage'
+import ISDUPage from './pages/ISDUPage'
 import PDIPage from './pages/PDIPage'
 import PortOverviewPage from './pages/PortOverviewPage'
 
-type AppPage = 'pdi' | 'overview' | 'isdu' | 'mqtt' | 'ai'
+type AppPage = 'pdi' | 'overview' | 'iodd' | 'isdu' | 'ai'
 
 const navigationItems: Array<{
   id: AppPage
@@ -22,12 +24,12 @@ const navigationItems: Array<{
     label: 'Port Overview',
   },
   {
-    id: 'isdu',
-    label: 'ISDU',
+    id: 'iodd',
+    label: 'IODD Library',
   },
   {
-    id: 'mqtt',
-    label: 'MQTT',
+    id: 'isdu',
+    label: 'ISDU',
   },
   {
     id: 'ai',
@@ -39,29 +41,73 @@ function AppShell() {
   const workspace = useMonitoringWorkspaceContext()
   const [activePage, setActivePage] = useState<AppPage>('pdi')
 
-  const activePageMeta = useMemo(
-    () => navigationItems.find((item) => item.id === activePage) ?? navigationItems[0],
-    [activePage],
-  )
+  useEffect(() => {
+    const root = document.documentElement
+    const runtimeSearchParams = new URLSearchParams(window.location.search)
+    const isDesktopRuntime = runtimeSearchParams.get('desktop') === '1'
+    let animationFrameId = 0
+    let lastViewportWidth = 0
+    let lastViewportHeight = 0
 
-  const placeholderPage = (
-    <section className="placeholder-page">
-      <p className="section-kicker">{activePageMeta.label}</p>
-      <h2 className="page-title">Module shell ready</h2>
-      <p className="page-description">
-        This category is already represented in the workspace architecture. The
-        shell, command strip, navigation, and shared live data model are ready
-        for deeper implementation when we build the next phase.
-      </p>
-    </section>
-  )
+    function applyViewportMetrics() {
+      const viewportWidth = Math.round(
+        document.documentElement.clientWidth || window.innerWidth,
+      )
+      const viewportHeight = Math.round(
+        document.documentElement.clientHeight || window.innerHeight,
+      )
+
+      if (
+        Math.abs(viewportWidth - lastViewportWidth) < 2 &&
+        Math.abs(viewportHeight - lastViewportHeight) < 2
+      ) {
+        return
+      }
+
+      lastViewportWidth = viewportWidth
+      lastViewportHeight = viewportHeight
+
+      root.dataset.runtime = isDesktopRuntime ? 'desktop' : 'browser'
+      root.style.setProperty('--app-viewport-width', `${viewportWidth}px`)
+      root.style.setProperty('--app-viewport-height', `${viewportHeight}px`)
+    }
+
+    function scheduleViewportMetrics() {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = window.requestAnimationFrame(applyViewportMetrics)
+    }
+
+    scheduleViewportMetrics()
+    window.addEventListener('resize', scheduleViewportMetrics)
+    if (!isDesktopRuntime) {
+      window.visualViewport?.addEventListener('resize', scheduleViewportMetrics)
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId)
+      window.removeEventListener('resize', scheduleViewportMetrics)
+      if (!isDesktopRuntime) {
+        window.visualViewport?.removeEventListener('resize', scheduleViewportMetrics)
+      }
+      root.style.removeProperty('--app-viewport-width')
+      root.style.removeProperty('--app-viewport-height')
+      if (!isDesktopRuntime) {
+        delete root.dataset.runtime
+      }
+    }
+  }, [])
 
   return (
     <div className={`app-shell app-shell--${activePage}`}>
       <aside className="app-rail">
         <div className="rail-brand">
-          <p className="rail-brand__kicker">Industrial operations platform</p>
-          <h1 className="rail-brand__title">ICE2 Nexus</h1>
+          <div className="rail-brand__logo-shell" aria-label="Masterway">
+            <img
+              className="rail-brand__logo"
+              src="/masterway-logo-transparent.png"
+              alt="Masterway"
+            />
+          </div>
         </div>
 
         <nav className="rail-nav" aria-label="Primary">
@@ -79,43 +125,7 @@ function AppShell() {
       </aside>
 
       <main className={`workspace-shell workspace-shell--${activePage}`}>
-        <CommandStrip
-          connectionDraft={workspace.connectionDraft}
-          backendMode={workspace.backendModeLabel}
-          connectionSummary={workspace.connectionSummary}
-          connectionMeta={workspace.connectionMeta}
-          communicationStateLabel={workspace.communicationPresentation.label}
-          communicationTone={workspace.communicationPresentation.tone}
-          staleStateLabel={workspace.staleStateLabel}
-          staleStateTone={workspace.staleStateTone}
-          lastUpdatedLabel={workspace.lastUpdatedLabel}
-          historyWindowMs={workspace.historyWindowMs}
-          banner={workspace.banner}
-          isConnecting={workspace.isConnecting}
-          isDisconnecting={workspace.isDisconnecting}
-          onConnectionChange={workspace.setConnectionDraft}
-          onHistoryWindowChange={workspace.setHistoryWindowMs}
-          onConnect={() => void workspace.handleConnect()}
-          onDisconnect={() => void workspace.handleDisconnect()}
-          onRefresh={() => void workspace.refreshDashboard({ force: true })}
-        />
-
-        <KpiBar
-          totalPorts={workspace.ports.length}
-          normalPorts={workspace.severityCounts.normal}
-          warningPorts={workspace.severityCounts.warning}
-          criticalPorts={workspace.severityCounts.critical}
-          backendMode={workspace.backendModeLabel}
-          connectionState={workspace.communicationPresentation.label}
-          connectionTone={workspace.communicationPresentation.tone}
-          connectionMeta={workspace.connectionMeta}
-          backendPollMs={workspace.dashboard?.polling.interval_ms ?? 50}
-          uiRefreshMs={workspace.uiRefreshMs}
-          cacheAgeMs={workspace.dashboard?.polling.age_ms ?? null}
-          cacheIsStale={workspace.dashboard?.polling.is_stale ?? false}
-          lastUpdated={workspace.lastUpdatedLabel}
-          isRefreshing={workspace.isRefreshing}
-        />
+        <ConnectionBar />
 
         {activePage === 'pdi' ? (
           <PDIPage
@@ -127,10 +137,14 @@ function AppShell() {
         ) : null}
 
         {activePage === 'overview' ? <PortOverviewPage /> : null}
-        {activePage === 'isdu' || activePage === 'mqtt' || activePage === 'ai'
-          ? placeholderPage
-          : null}
+        {activePage === 'iodd' ? <IODDLibraryPage /> : null}
+        {activePage === 'isdu' ? <ISDUPage /> : null}
+        {activePage === 'ai' ? <AIDiagnosticsPage /> : null}
       </main>
+
+      <div className="app-credit" aria-label="Developer credit">
+        Developed by Hye In, Woo (Wayne)
+      </div>
     </div>
   )
 }

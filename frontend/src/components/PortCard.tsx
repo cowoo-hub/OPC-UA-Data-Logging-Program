@@ -6,17 +6,29 @@ import type {
   DecodeType,
   PortDisplayConfig,
   PortDisplayOverride,
+  ResolutionFactor,
   PortSeverity,
   PortSnapshot,
   WordOrder,
 } from '../api/types'
+import type { PortTrendSeries } from '../utils/history'
+import {
+  RESOLUTION_FACTOR_OPTIONS,
+  formatResolutionFactor,
+} from '../utils/portDisplay'
+import { formatDecodedValue } from '../utils/decode'
+import StableSelect from './StableSelect'
 import StatusBadge from './StatusBadge'
+import StatusBitIndicators from './StatusBitIndicators'
+import TrendSparkline from './TrendSparkline'
 
 interface PortCardProps {
   snapshot: PortSnapshot
   displayConfig: PortDisplayConfig
   displayOverride: PortDisplayOverride | null
   featuredPreview: DecodedPreview
+  trendSeries: PortTrendSeries
+  historyWindowLabel: string
   onOverrideChange: (portNumber: number, override: PortDisplayOverride) => void
   onOpenOverview: (portNumber: number) => void
 }
@@ -74,6 +86,8 @@ function PortCard({
   displayConfig,
   displayOverride,
   featuredPreview,
+  trendSeries,
+  historyWindowLabel,
   onOverrideChange,
   onOpenOverview,
 }: PortCardProps) {
@@ -117,9 +131,54 @@ function PortCard({
   )
 
   const hasProfileOverride =
+    displayOverride?.engineeringUnit !== undefined ||
     displayOverride?.preferredDecodeType !== undefined ||
     displayOverride?.wordOrder !== undefined ||
-    displayOverride?.byteOrder !== undefined
+    displayOverride?.byteOrder !== undefined ||
+    displayOverride?.resolutionFactor !== undefined ||
+    displayOverride?.sourceWordCount !== undefined ||
+    displayOverride?.fieldMode !== undefined ||
+    displayOverride?.bitOffset !== undefined ||
+    displayOverride?.bitLength !== undefined ||
+    displayOverride?.signed !== undefined ||
+    displayOverride?.sentinelMappings !== undefined ||
+    displayOverride?.statusBits !== undefined
+
+  const valueMeta = useMemo(() => {
+    if (featuredPreview.error) {
+      return featuredPreview.error
+    }
+
+    if (
+      featuredPreview.sentinelLabel &&
+      typeof featuredPreview.mappingComparisonValue === 'number'
+    ) {
+      return `Value ${formatDecodedValue(
+        featuredPreview.mappingComparisonValue,
+        displayConfig.preferredDecodeType,
+      )} | Custom map`
+    }
+
+    if (
+      displayConfig.resolutionFactor !== 1 &&
+      featuredPreview.rawDisplayValue &&
+      featuredPreview.rawDisplayValue !== featuredPreview.displayValue
+    ) {
+      return `Raw ${featuredPreview.rawDisplayValue} | x${formatResolutionFactor(displayConfig.resolutionFactor)}`
+    }
+
+    return buildRegisterMeta(pdi?.payload.registers ?? [])
+  }, [
+    displayConfig.preferredDecodeType,
+    displayConfig.resolutionFactor,
+    featuredPreview.displayValue,
+    featuredPreview.error,
+    featuredPreview.mappingComparisonValue,
+    featuredPreview.rawDisplayValue,
+    featuredPreview.sentinelLabel,
+    pdi?.payload.registers,
+  ])
+  const liveStatusBits = featuredPreview.statusBits
 
   function updateProfileField<Key extends keyof PortDisplayOverride>(
     field: Key,
@@ -136,6 +195,7 @@ function PortCard({
     delete nextOverride.preferredDecodeType
     delete nextOverride.wordOrder
     delete nextOverride.byteOrder
+    delete nextOverride.resolutionFactor
     onOverrideChange(portNumber, nextOverride)
   }
 
@@ -159,14 +219,19 @@ function PortCard({
         <div className="monitor-card__value-copy">
           <p className="monitor-card__value-label">{displayConfig.engineeringLabel}</p>
           <div className="monitor-card__value-line">
-            <strong className="monitor-card__value">{featuredPreview.displayValue}</strong>
-            {displayConfig.engineeringUnit ? (
-              <span className="monitor-card__unit">{displayConfig.engineeringUnit}</span>
-            ) : null}
+            <div className="monitor-card__value-line-main">
+              <strong className="monitor-card__value">{featuredPreview.displayValue}</strong>
+              {displayConfig.engineeringUnit ? (
+                <span className="monitor-card__unit">{displayConfig.engineeringUnit}</span>
+              ) : null}
+            </div>
+            <StatusBitIndicators
+              statusBits={liveStatusBits}
+              className="status-bit-indicators--card"
+              maxItems={2}
+            />
           </div>
-          <p className="monitor-card__value-meta">
-            {featuredPreview.error ?? buildRegisterMeta(pdi?.payload.registers ?? [])}
-          </p>
+          <p className="monitor-card__value-meta">{valueMeta}</p>
         </div>
 
         <div className="monitor-card__indicator-row">
@@ -177,78 +242,98 @@ function PortCard({
             </div>
           ))}
         </div>
-      </div>
 
-      <div className="monitor-card__raw">
-        <span className="monitor-card__raw-label">Raw preview</span>
-        <code className="monitor-card__raw-value">{rawPreview}</code>
-      </div>
+        <div className="monitor-card__raw">
+          <span className="monitor-card__raw-label">Raw preview</span>
+          <code className="monitor-card__raw-value">{rawPreview}</code>
+        </div>
 
-      <div className="monitor-card__profile-strip">
-        <label className="monitor-card__profile-field">
-          <span className="monitor-card__profile-label">Decode</span>
-          <select
-            value={displayConfig.preferredDecodeType}
-            onChange={(event) =>
-              updateProfileField('preferredDecodeType', event.target.value as DecodeType)
-            }
-          >
-            {decodeTypeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="monitor-card__profile-strip">
+          <label className="monitor-card__profile-field">
+            <span className="monitor-card__profile-label">Decode</span>
+            <StableSelect
+              value={displayConfig.preferredDecodeType}
+              onChange={(nextValue) =>
+                updateProfileField('preferredDecodeType', nextValue as DecodeType)
+              }
+              options={decodeTypeOptions}
+              className="stable-select--compact"
+              triggerClassName="stable-select__trigger--compact"
+              menuClassName="stable-select__menu--compact"
+            />
+          </label>
 
-        <label className="monitor-card__profile-field">
-          <span className="monitor-card__profile-label">Words</span>
-          <select
-            value={displayConfig.wordOrder}
-            onChange={(event) =>
-              updateProfileField('wordOrder', event.target.value as WordOrder)
-            }
-          >
-            {wordOrderOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="monitor-card__profile-field">
+            <span className="monitor-card__profile-label">Words</span>
+            <StableSelect
+              value={displayConfig.wordOrder}
+              onChange={(nextValue) =>
+                updateProfileField('wordOrder', nextValue as WordOrder)
+              }
+              options={wordOrderOptions}
+              className="stable-select--compact"
+              triggerClassName="stable-select__trigger--compact"
+              menuClassName="stable-select__menu--compact"
+            />
+          </label>
 
-        <label className="monitor-card__profile-field">
-          <span className="monitor-card__profile-label">Bytes</span>
-          <select
-            value={displayConfig.byteOrder}
-            onChange={(event) =>
-              updateProfileField('byteOrder', event.target.value as ByteOrder)
-            }
-          >
-            {byteOrderOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="monitor-card__profile-field">
+            <span className="monitor-card__profile-label">Bytes</span>
+            <StableSelect
+              value={displayConfig.byteOrder}
+              onChange={(nextValue) =>
+                updateProfileField('byteOrder', nextValue as ByteOrder)
+              }
+              options={byteOrderOptions}
+              className="stable-select--compact"
+              triggerClassName="stable-select__trigger--compact"
+              menuClassName="stable-select__menu--compact"
+            />
+          </label>
 
-        <div className="monitor-card__actions">
-          <button
-            type="button"
-            className="action-button action-button--ghost action-button--compact"
-            onClick={() => onOpenOverview(portNumber)}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            className="action-button action-button--ghost action-button--compact"
-            onClick={clearQuickProfile}
-            disabled={!hasProfileOverride}
-          >
-            Default
-          </button>
+          <label className="monitor-card__profile-field">
+            <span className="monitor-card__profile-label">Scale</span>
+            <StableSelect
+              value={String(displayConfig.resolutionFactor)}
+              onChange={(nextValue) =>
+                updateProfileField('resolutionFactor', Number(nextValue) as ResolutionFactor)
+              }
+              options={RESOLUTION_FACTOR_OPTIONS.map((option) => ({
+                value: String(option),
+                label: formatResolutionFactor(option),
+              }))}
+              className="stable-select--compact"
+              triggerClassName="stable-select__trigger--compact"
+              menuClassName="stable-select__menu--compact"
+            />
+          </label>
+
+          <div className="monitor-card__actions">
+            <button
+              type="button"
+              className="action-button action-button--ghost action-button--compact"
+              onClick={() => onOpenOverview(portNumber)}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              className="action-button action-button--ghost action-button--compact"
+              onClick={clearQuickProfile}
+              disabled={!hasProfileOverride}
+            >
+              Default
+            </button>
+          </div>
+        </div>
+
+        <div className="monitor-card__trend">
+          <TrendSparkline
+            series={trendSeries}
+            severity={severity}
+            windowLabel={historyWindowLabel}
+            variant="card"
+          />
         </div>
       </div>
     </article>
@@ -261,5 +346,7 @@ export default memo(
     previousProps.snapshot === nextProps.snapshot &&
     previousProps.displayConfig === nextProps.displayConfig &&
     previousProps.displayOverride === nextProps.displayOverride &&
-    previousProps.featuredPreview === nextProps.featuredPreview,
+    previousProps.featuredPreview === nextProps.featuredPreview &&
+    previousProps.trendSeries === nextProps.trendSeries &&
+    previousProps.historyWindowLabel === nextProps.historyWindowLabel,
 )

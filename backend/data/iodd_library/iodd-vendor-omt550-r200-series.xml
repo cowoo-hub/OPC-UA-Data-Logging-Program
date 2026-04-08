@@ -1,0 +1,1518 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<IODevice xmlns="http://www.io-link.com/IODD/2010/10" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.io-link.com/IODD/2010/10 IODD1.1.xsd">
+  <DocumentInfo version="V1.00.002" releaseDate="2019-03-30" copyright="Copyright 2018-2019, Pepperl+Fuchs GmbH"/>
+  <ProfileHeader>
+    <ProfileIdentification>IO Device Profile</ProfileIdentification>
+    <ProfileRevision>1.1</ProfileRevision>
+    <ProfileName>Device Profile for IO Devices</ProfileName>
+    <ProfileSource>IO-Link Consortium</ProfileSource>
+    <ProfileClassID>Device</ProfileClassID>
+    <ISO15745Reference>
+      <ISO15745Part>1</ISO15745Part>
+      <ISO15745Edition>1</ISO15745Edition>
+      <ProfileTechnology>IODD</ProfileTechnology>
+    </ISO15745Reference>
+  </ProfileHeader>
+  <ProfileBody>
+    <!-- OMT / R200 / STD - DeviceID 0x111901 -->
+    <DeviceIdentity vendorId="1" vendorName="Pepperl+Fuchs" deviceId="1120513">
+      <VendorText textId="T_VendorText"/>
+      <VendorUrl textId="T_VendorUrl"/>
+      <VendorLogo name="Pepperl-Fuchs-logo.png"/>
+      <DeviceName textId="T_DeviceName"/>
+      <DeviceFamily textId="T_DeviceFamily"/>
+      <DeviceVariantCollection>
+        <!-- PR:OMT   / 550/R200/RD /CABL/2M0-4/STD/IO/2PP/AV/NI/NN -->
+        <DeviceVariant productId="295670-100132" deviceSymbol="Pepperl-Fuchs-R200_cable-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100132"/>
+          <Description textId="TD_ProductDescr_295670-100132"/>
+        </DeviceVariant>
+        <!-- PR:OMT   / 550/R200/RD /PMMA/PLUG/M8.3 /STD/IO/1PP/NA/NI/NN -->
+        <DeviceVariant productId="295670-100128" deviceSymbol="Pepperl-Fuchs-R200_plug-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100128"/>
+          <Description textId="TD_ProductDescr_295670-100128"/>
+        </DeviceVariant>
+        <!-- PR:OMT   / 550/R200/RD /PMMA/PLUG/M8.4 /STD/IO/2PP/AV/NI/NN -->
+        <DeviceVariant productId="295670-100130" deviceSymbol="Pepperl-Fuchs-R200_plug-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100130"/>
+          <Description textId="TD_ProductDescr_295670-100130"/>
+        </DeviceVariant>
+        <!-- PR:OMT   / 550/R200/RD /PMMA/PLUG/M12.4 /STD/IO/2PP/AV/NI/NN -->
+        <DeviceVariant productId="295670-100133" deviceSymbol="Pepperl-Fuchs-R200_plug-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100133"/>
+          <Description textId="TD_ProductDescr_295670-100133"/>
+        </DeviceVariant>
+        <!-- PR:OMT   / 550/R200/RD /PMMA/PIGT/M8.3 /STD/IO/1PP/NA/NI/NN -->
+        <DeviceVariant productId="295670-100129" deviceSymbol="Pepperl-Fuchs-R200_cable-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100129"/>
+          <Description textId="TD_ProductDescr_295670-100129"/>
+        </DeviceVariant>
+        <!-- PR:OMT   / 550/R200/RD /PMMA/PIGT/M8.4 /STD/IO/2PP/AV/NI/NN -->
+        <DeviceVariant productId="295670-100131" deviceSymbol="Pepperl-Fuchs-R200_cable-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100131"/>
+          <Description textId="TD_ProductDescr_295670-100131"/>
+        </DeviceVariant>
+        <!-- PR:OMT   / 550/R200/RD /PMMA/PIGT/M12.4/STD/IO/2PP/AV/NI/NN -->
+        <DeviceVariant productId="295670-100134" deviceSymbol="Pepperl-Fuchs-R200_cable-pic.png" deviceIcon="Pepperl-Fuchs-R200-icon.png">
+          <Name textId="TN_ProductName_295670-100134"/>
+          <Description textId="TD_ProductDescr_295670-100134"/>
+        </DeviceVariant>
+      </DeviceVariantCollection>
+    </DeviceIdentity>
+    <DeviceFunction>
+      <Features blockParameter="true" dataStorage="true" profileCharacteristic="1 12 16384 32769 32772">
+        <!-- profileCharacteristic = Smart Sensor Profile Type 0 / Type 3.3 | Identification&Diagnosis -->
+        <SupportedAccessLocks parameter="false" dataStorage="true" localParameterization="true" localUserInterface="false"/>
+      </Features>
+      <DatatypeCollection>
+        <Datatype id="D_i16Setpoint" xsi:type="IntegerT" bitLength="16">
+          <ValueRange lowerValue="0" upperValue="6600"/>
+        </Datatype>
+        <Datatype id="D_stSetpointValues0" xsi:type="RecordT" bitLength="32">
+          <RecordItem subindex="1" bitOffset="16">
+            <DatatypeRef datatypeId="D_i16Setpoint"/>
+            <Name textId="TN_vSSP_SSCn_SP1"/>
+            <Description textId="TD_vSSP_SSCn_SP1"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="0">
+            <DatatypeRef datatypeId="D_i16Setpoint"/>
+            <Name textId="TN_vSSP_SSCn_SP2"/>
+            <Description textId="TD_vSSP_SSCn_SP2"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_u8Logic" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svSSP_Logic_highactive"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svSSP_Logic_lowactive"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8EvalMode1" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svSSP_SSC_Mode_inactive"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svSSP_SSC_Mode_singlepoint"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svSSP_SSC_Mode_window"/>
+          </SingleValue>
+          <SingleValue value="3">
+            <Name textId="TN_svSSP_SSC_Mode_twopoint"/>
+          </SingleValue>
+          <SingleValue value="128">
+            <Name textId="TN_svPFO_SSC_Mode_centerwindow"/>
+          </SingleValue>
+          <!--                    <SingleValue value="129">
+                        <Name textId="TN_svPFO_SSC_Mode_bgs"/>
+                    </SingleValue>
+                    <SingleValue value="130">
+                        <Name textId="TN_svPFO_SSC_Mode_bge"/>
+                    </SingleValue>
+					-->
+        </Datatype>
+        <Datatype id="D_i16SetpointHys" xsi:type="IntegerT" bitLength="16">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_SSC_SPHys_std"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_SSC_SPHys_alt"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stSetpointConfig0" xsi:type="RecordT" bitLength="32">
+          <RecordItem subindex="1" bitOffset="24">
+            <DatatypeRef datatypeId="D_u8Logic"/>
+            <Name textId="TN_vSSP_SSCn_Logic"/>
+            <Description textId="TD_vSSP_SSCn_Logic"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="16">
+            <DatatypeRef datatypeId="D_u8EvalMode1"/>
+            <Name textId="TN_vSSP_SSCn_Mode"/>
+            <Description textId="TD_vSSP_SSCn_Mode"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="0">
+            <DatatypeRef datatypeId="D_i16SetpointHys"/>
+            <Name textId="TN_vSSP_SSCn_SPHys"/>
+            <Description textId="TD_vSSP_SSCn_SPHys"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_i16SetpointOffset0" xsi:type="IntegerT" bitLength="16">
+          <ValueRange lowerValue="10" upperValue="1800"/>
+        </Datatype>
+        <Datatype id="D_i16MVOffset0" xsi:type="IntegerT" bitLength="16">
+          <ValueRange lowerValue="-3800" upperValue="600"/>
+        </Datatype>
+        <Datatype id="D_stDelayTimer" xsi:type="RecordT" bitLength="40">
+          <RecordItem subindex="1" bitOffset="24">
+            <DatatypeRef datatypeId="D_i16DelayTime"/>
+            <Name textId="TN_vPFS_SSCn_OffDelay"/>
+            <Description textId="TD_vPFS_SSCn_OffDelay"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="8">
+            <DatatypeRef datatypeId="D_i16DelayTime"/>
+            <Name textId="TN_vPFS_SSCn_OnDelay"/>
+            <Description textId="TD_vPFS_SSCn_OnDelay"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="0">
+            <DatatypeRef datatypeId="D_u8DelayMode"/>
+            <Name textId="TN_vPFO_SSCn_DelayMode"/>
+            <Description textId="TD_vPFO_SSCn_DelayMode"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_i16DelayTime" xsi:type="UIntegerT" bitLength="16">
+          <SingleValue value="0">
+            <Name textId="TN_svPFS_SSC_DelayTime_inactive"/>
+          </SingleValue>
+          <ValueRange lowerValue="1" upperValue="60000"/>
+        </Datatype>
+        <Datatype id="D_u8DelayMode" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_SSC_DelayMode_onoffdly"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_SSC_DelayMode_ondlyoneshot"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8TeachSelect" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svSSP_TI_Select_default"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svSSP_TI_Select_ssc1"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svSSP_TI_Select_ssc2"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stTeachResult2" xsi:type="RecordT" bitLength="8" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <SimpleDatatype xsi:type="UIntegerT" bitLength="4">
+              <SingleValue value="0">
+                <Name textId="TN_svSSP_TI_Result_State_idle"/>
+              </SingleValue>
+              <SingleValue value="1">
+                <Name textId="TN_svSSP_TI_Result_State_success_sp1"/>
+              </SingleValue>
+              <SingleValue value="2">
+                <Name textId="TN_svSSP_TI_Result_State_success_sp2"/>
+              </SingleValue>
+              <SingleValue value="3">
+                <Name textId="TN_svSSP_TI_Result_State_success_sp12"/>
+              </SingleValue>
+              <SingleValue value="4">
+                <Name textId="TN_svSSP_TI_Result_State_waitforcmd"/>
+              </SingleValue>
+              <SingleValue value="5">
+                <Name textId="TN_svSSP_TI_Result_State_busy"/>
+              </SingleValue>
+              <SingleValue value="7">
+                <Name textId="TN_svSSP_TI_Result_State_error"/>
+              </SingleValue>
+              <SingleValue value="12">
+                <Name textId="TN_svPFO_TI_Result_State_success_mvoffset"/>
+              </SingleValue>
+            </SimpleDatatype>
+            <Name textId="TN_vSSP_TI_Result_State"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="4">
+            <DatatypeRef datatypeId="D_bTI_Flag"/>
+            <Name textId="TN_vSSP_TI_Result_Sp1Tp1"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="5">
+            <DatatypeRef datatypeId="D_bTI_Flag"/>
+            <Name textId="TN_vSSP_TI_Result_Sp1Tp2"/>
+          </RecordItem>
+          <RecordItem subindex="4" bitOffset="6">
+            <DatatypeRef datatypeId="D_bTI_Flag"/>
+            <Name textId="TN_vSSP_TI_Result_Sp2Tp1"/>
+          </RecordItem>
+          <RecordItem subindex="5" bitOffset="7">
+            <DatatypeRef datatypeId="D_bTI_Flag"/>
+            <Name textId="TN_vSSP_TI_Result_Sp2Tp2"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_bTI_Flag" xsi:type="BooleanT">
+          <SingleValue value="0">
+            <Name textId="TN_svSSP_TI_Flag_TPna"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svSSP_TI_Flag_TPsuccess"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8EvalFilter1" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_Eval_Filter_factorx1"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_Eval_Filter_factorx2"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svPFO_Eval_Filter_factorx4"/>
+          </SingleValue>
+          <SingleValue value="3">
+            <Name textId="TN_svPFO_Eval_Filter_factorx16"/>
+          </SingleValue>
+          <SingleValue value="4">
+            <Name textId="TN_svPFO_Eval_Filter_factorx64"/>
+          </SingleValue>
+          <SingleValue value="5">
+            <Name textId="TN_svPFO_Eval_Filter_factorx256"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stPdConfig0" xsi:type="RecordT" bitLength="8" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFS_PD_Config_CSC1"/>
+            <Description textId="TD_vPFS_PD_Config_CSC1"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="1">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFS_PD_Config_CSC2"/>
+            <Description textId="TD_vPFS_PD_Config_CSC2"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_u8IQType0" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_IO_Type_def"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_IO_Type_pp"/>
+          </SingleValue>
+          <SingleValue value="4">
+            <Name textId="TN_svPFO_IO_Type_hz"/>
+          </SingleValue>
+          <SingleValue value="5">
+            <Name textId="TN_svPFO_IO_Type_highactive"/>
+          </SingleValue>
+          <SingleValue value="6">
+            <Name textId="TN_svPFO_IO_Type_lowactive"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8OutFunc0" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_IO_OutFunc_def"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_IO_OutFunc_antivalent"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svPFO_IO_OutFunc_equivalent"/>
+          </SingleValue>
+          <SingleValue value="3">
+            <Name textId="TN_svPFO_IO_OutFunc_ssc2"/>
+          </SingleValue>
+          <SingleValue value="255">
+            <Name textId="TN_svPFO_IO_OutFunc_constant"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8InFunc0" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_IO_InFunc_def"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_IO_InFunc_test"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svPFO_IO_InFunc_teach"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stEventConfig0" xsi:type="RecordT" bitLength="16" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <DatatypeRef datatypeId="D_bDisable"/>
+            <Name textId="TN_vPFS_Event_Config_StabilityAlarm"/>
+            <Description textId="TD_vPFS_Event_Config_StabilityAlarm"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="1">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFS_Event_Config_MeasInvalid"/>
+            <Description textId="TD_vPFS_Event_Config_MeasInvalid"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="2">
+            <DatatypeRef datatypeId="D_bDisable"/>
+            <Name textId="TN_vPFS_Event_Config_SignalError"/>
+            <Description textId="TD_vPFS_Event_Config_SignalError"/>
+          </RecordItem>
+          <RecordItem subindex="9" bitOffset="8">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFS_Event_Config_TestMode"/>
+            <Description textId="TD_vPFS_Event_Config_TestMode"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_u8DeviceControl0" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_Device_Control_normal"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_Device_Control_transducerdisable"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stUIControl0" xsi:type="RecordT" bitLength="8" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFO_UI_Control_LocalControl"/>
+            <Description textId="TD_vPFO_UI_Control_LocalControl"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_stIndicationControl0" xsi:type="RecordT" bitLength="8" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFO_UI_IndicationControl_Locator"/>
+            <Description textId="TD_vPFO_UI_IndicationControl_Locator"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_u32OperatingHour" xsi:type="UIntegerT" bitLength="32"/>
+        <Datatype id="D_u8TempIndicator" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_OPM_TempIndicator_safe"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_OPM_TempIndicator_criticalhigh"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svPFO_OPM_TempIndicator_overtemp"/>
+          </SingleValue>
+          <SingleValue value="3">
+            <Name textId="TN_svPFO_OPM_TempIndicator_criticallow"/>
+          </SingleValue>
+          <SingleValue value="4">
+            <Name textId="TN_svPFO_OPM_TempIndicator_undertemp"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stDeviceChar0" xsi:type="RecordT" bitLength="48" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="32">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="16">
+						</SimpleDatatype>
+            <Name textId="TN_vPFS_Device_Char_DetectRngMin"/>
+            <Description textId="TD_vPFS_Device_Char_DetectRngMin"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="16">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="16">
+						</SimpleDatatype>
+            <Name textId="TN_vPFS_Device_Char_DetectRngMax"/>
+            <Description textId="TD_vPFS_Device_Char_DetectRngMax"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="0">
+            <SimpleDatatype xsi:type="UIntegerT" bitLength="16">
+						</SimpleDatatype>
+            <Name textId="TN_vPFS_Device_Char_SupplyCurrMax"/>
+            <Description textId="TD_vPFS_Device_Char_SupplyCurrMax"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_stDeviceStateFlags0" xsi:type="RecordT" bitLength="8" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <DatatypeRef datatypeId="D_bOnOff"/>
+            <Name textId="TN_vPFO_Device_State_TransducerDis"/>
+            <Description textId="TD_vPFO_Device_State_TransducerDis"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="1">
+            <DatatypeRef datatypeId="D_bEnDisable"/>
+            <Name textId="TN_vPFO_Device_State_LocalCntrl"/>
+            <Description textId="TD_vPFO_Device_State_LocalCntrl"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_u16Feature" xsi:type="UIntegerT" bitLength="16">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_IO_Feature_cq"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_IO_Feature_cqao"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svPFO_IO_Feature_cqiq"/>
+          </SingleValue>
+          <SingleValue value="3">
+            <Name textId="TN_svPFO_IO_Feature_cqiqao"/>
+          </SingleValue>
+          <SingleValue value="5">
+            <Name textId="TN_svPFO_IO_Feature_cqaoin"/>
+          </SingleValue>
+          <SingleValue value="6">
+            <Name textId="TN_svPFO_IO_Feature_cqiqin"/>
+          </SingleValue>
+          <SingleValue value="7">
+            <Name textId="TN_svPFO_IO_Feature_cqiqaoin"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_stMDC_Descriptor" xsi:type="RecordT" bitLength="88" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="56">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="32">
+						</SimpleDatatype>
+            <Name textId="TN_vSSP_MDC_Descriptor_LowerLimit"/>
+            <Description textId="TD_vSSP_MDC_Descriptor_LowerLimit"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="24">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="32">
+						</SimpleDatatype>
+            <Name textId="TN_vSSP_MDC_Descriptor_UpperLimit"/>
+            <Description textId="TD_vSSP_MDC_Descriptor_UpperLimit"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="8">
+            <SimpleDatatype xsi:type="UIntegerT" bitLength="16">
+						</SimpleDatatype>
+            <Name textId="TN_vSSP_MDC_Descriptor_UnitCode"/>
+            <Description textId="TD_vSSP_MDC_Descriptor_UnitCode"/>
+          </RecordItem>
+          <RecordItem subindex="4" bitOffset="0">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="8">
+						</SimpleDatatype>
+            <Name textId="TN_vSSP_MDC_Descriptor_Scale"/>
+            <Description textId="TD_vSSP_MDC_Descriptor_Scale"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_stMeasData2" xsi:type="RecordT" bitLength="56" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="40">
+            <DatatypeRef datatypeId="D_i16Measvalue"/>
+            <Name textId="TN_vSSP_MeasValue"/>
+            <Description textId="TD_vSSP_MeasValue"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="32">
+            <DatatypeRef datatypeId="D_u8SQIValue"/>
+            <Name textId="TN_vPFO_SQIValue"/>
+            <Description textId="TD_vPFO_SQIValue"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="24">
+            <DatatypeRef datatypeId="D_u8State"/>
+            <Name textId="TN_vSSP_SSC1_SwitchingSig"/>
+            <Description textId="TD_vSSP_SSC1_SwitchingSig"/>
+          </RecordItem>
+          <RecordItem subindex="4" bitOffset="16">
+            <DatatypeRef datatypeId="D_u8State"/>
+            <Name textId="TN_vSSP_SSC2_SwitchingSig"/>
+            <Description textId="TD_vSSP_SSC2_SwitchingSig"/>
+          </RecordItem>
+          <RecordItem subindex="5" bitOffset="0">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="16">
+						</SimpleDatatype>
+            <Name textId="TN_vPFO_TIValue"/>
+            <Description textId="TD_vPFO_TIValue"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_stPDI32_16I_8I_2U_2B" xsi:type="RecordT" bitLength="32" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="16">
+            <DatatypeRef datatypeId="D_i16Measvalue"/>
+            <Name textId="TN_vSSP_MeasValue"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="8">
+            <SimpleDatatype xsi:type="IntegerT" bitLength="8">
+						</SimpleDatatype>
+            <Name textId="TN_vSSP_Scale"/>
+          </RecordItem>
+          <RecordItem subindex="3" bitOffset="0">
+            <DatatypeRef datatypeId="D_bState"/>
+            <Name textId="TN_vSSP_SSC1_SwitchingSig"/>
+          </RecordItem>
+          <RecordItem subindex="4" bitOffset="1">
+            <DatatypeRef datatypeId="D_bState"/>
+            <Name textId="TN_vSSP_SSC2_SwitchingSig"/>
+          </RecordItem>
+          <RecordItem subindex="5" bitOffset="2">
+            <SimpleDatatype xsi:type="UIntegerT" bitLength="2">
+              <SingleValue value="0">
+                <Name textId="TN_svPFO_SQIValue_insufficient"/>
+              </SingleValue>
+              <SingleValue value="1">
+                <Name textId="TN_svPFO_SQIValue_acceptable"/>
+              </SingleValue>
+              <SingleValue value="2">
+                <Name textId="TN_svPFO_SQIValue_good"/>
+              </SingleValue>
+              <SingleValue value="3">
+                <Name textId="TN_svPFO_SQIValue_excellent"/>
+              </SingleValue>
+            </SimpleDatatype>
+            <Name textId="TN_vPFO_SQIValue"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_stPDO8_2B" xsi:type="RecordT" bitLength="2" subindexAccessSupported="false">
+          <RecordItem subindex="1" bitOffset="0">
+            <DatatypeRef datatypeId="D_bState"/>
+            <Name textId="TN_vSSP_CSC1"/>
+          </RecordItem>
+          <RecordItem subindex="2" bitOffset="1">
+            <DatatypeRef datatypeId="D_bState"/>
+            <Name textId="TN_vPFO_CSC2"/>
+          </RecordItem>
+        </Datatype>
+        <Datatype id="D_i16Measvalue" xsi:type="IntegerT" bitLength="16">
+          <ValueRange lowerValue="0" upperValue="32000"/>
+          <SingleValue value="32764">
+            <Name textId="TN_svSSP_MeasValue_nodata"/>
+          </SingleValue>
+          <SingleValue value="-32760">
+            <Name textId="TN_svSSP_MeasValue_belowrange"/>
+          </SingleValue>
+          <SingleValue value="32760">
+            <Name textId="TN_svSSP_MeasValue_aboverange"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8SQIValue" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="0">
+            <Name textId="TN_svPFO_SQIValue_insufficient"/>
+          </SingleValue>
+          <SingleValue value="1">
+            <Name textId="TN_svPFO_SQIValue_acceptable"/>
+          </SingleValue>
+          <SingleValue value="2">
+            <Name textId="TN_svPFO_SQIValue_good"/>
+          </SingleValue>
+          <SingleValue value="3">
+            <Name textId="TN_svPFO_SQIValue_excellent"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_bEnDisable" xsi:type="BooleanT">
+          <SingleValue value="true">
+            <Name textId="TN_svEnDisable_enable"/>
+          </SingleValue>
+          <SingleValue value="false">
+            <Name textId="TN_svEnDisable_disable"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_bDisable" xsi:type="BooleanT">
+          <SingleValue value="false">
+            <Name textId="TN_svEnDisable_disable"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_bOnOff" xsi:type="BooleanT">
+          <SingleValue value="true">
+            <Name textId="TN_svOnOff_off"/>
+          </SingleValue>
+          <SingleValue value="false">
+            <Name textId="TN_svOnOff_on"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_bState" xsi:type="BooleanT">
+          <SingleValue value="true">
+            <Name textId="TN_svState_active"/>
+          </SingleValue>
+          <SingleValue value="false">
+            <Name textId="TN_svState_inactive"/>
+          </SingleValue>
+        </Datatype>
+        <Datatype id="D_u8State" xsi:type="UIntegerT" bitLength="8">
+          <SingleValue value="1">
+            <Name textId="TN_svState_active"/>
+          </SingleValue>
+          <SingleValue value="0">
+            <Name textId="TN_svState_inactive"/>
+          </SingleValue>
+        </Datatype>
+      </DatatypeCollection>
+      <VariableCollection>
+        <StdVariableRef id="V_DirectParameters_1"/>
+        <StdVariableRef id="V_DirectParameters_2"/>
+        <StdVariableRef id="V_SystemCommand">
+          <StdSingleValueRef value="130"/>
+          <SingleValue value="65">
+            <Name textId="TN_svSSP_SysCmd_TIsvsp1"/>
+          </SingleValue>
+          <SingleValue value="66">
+            <Name textId="TN_svSSP_SysCmd_TIsvsp2"/>
+          </SingleValue>
+          <SingleValue value="170">
+            <Name textId="TN_svPFO_SysCmd_TIsvmeasoffs"/>
+          </SingleValue>
+        </StdVariableRef>
+        <StdVariableRef id="V_DeviceAccessLocks">
+          <!--<StdRecordItemRef subindex="1" defaultValue="0"/>-->
+          <StdRecordItemRef subindex="2" defaultValue="0"/>
+          <StdRecordItemRef subindex="3" defaultValue="0"/>
+          <!--<StdRecordItemRef subindex="4" defaultValue="0"/>-->
+        </StdVariableRef>
+        <StdVariableRef id="V_VendorName" defaultValue="Pepperl+Fuchs"/>
+        <StdVariableRef id="V_VendorText"/>
+        <StdVariableRef id="V_ProductName" defaultValue="OMT550 R200 series"/>
+        <StdVariableRef id="V_ProductID"/>
+        <StdVariableRef id="V_ProductText" defaultValue="Distance sensor"/>
+        <StdVariableRef id="V_SerialNumber"/>
+        <StdVariableRef id="V_HardwareRevision"/>
+        <StdVariableRef id="V_FirmwareRevision"/>
+        <StdVariableRef id="V_ApplicationSpecificTag" fixedLengthRestriction="32" excludedFromDataStorage="false"/>
+        <StdVariableRef id="V_DeviceStatus"/>
+        <StdVariableRef id="V_DetailedDeviceStatus" fixedLengthRestriction="4"/>
+        <Variable id="V_FunctionTag" index="25" accessRights="rw" excludedFromDataStorage="false">
+          <Datatype xsi:type="StringT" encoding="UTF-8" fixedLength="32"/>
+          <Name textId="TN_vFunctionTag"/>
+          <Description textId="TD_vFunctionTag"/>
+        </Variable>
+        <Variable id="V_LocationTag" index="26" accessRights="rw" excludedFromDataStorage="false">
+          <Datatype xsi:type="StringT" encoding="UTF-8" fixedLength="32"/>
+          <Name textId="TN_vLocationTag"/>
+          <Description textId="TD_vLocationTag"/>
+        </Variable>
+        <Variable id="V_PFO_IO_Feature" index="239" accessRights="ro" defaultValue="2">
+          <DatatypeRef datatypeId="D_u16Feature"/>
+          <Name textId="TN_vPFO_IO_Feature"/>
+          <Description textId="TD_vPFO_IO_Feature"/>
+        </Variable>
+        <Variable id="V_SSP_SSC1_SPV-t0" index="60" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stSetpointValues0"/>
+          <RecordItemInfo subindex="1" defaultValue="5000"/>
+          <RecordItemInfo subindex="2" defaultValue="3000"/>
+          <Name textId="TN_vSSP_SSC1_SwitchingSig_SPV"/>
+          <Description textId="TD_vSSP_SSC1_SPV"/>
+        </Variable>
+        <Variable id="V_SSP_SSC1_SPC-t0" index="61" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stSetpointConfig0"/>
+          <RecordItemInfo subindex="1" defaultValue="0"/>
+          <RecordItemInfo subindex="2" defaultValue="2"/>
+          <RecordItemInfo subindex="3" defaultValue="0"/>
+          <Name textId="TN_vSSP_SSC1_SPConfig"/>
+          <Description textId="TD_vSSP_SSC1_SPConfig"/>
+        </Variable>
+        <Variable id="V_SSP_SSC2_SPV-t0" index="62" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stSetpointValues0"/>
+          <RecordItemInfo subindex="1" defaultValue="4000"/>
+          <RecordItemInfo subindex="2" defaultValue="2000"/>
+          <Name textId="TN_vSSP_SSC2_SwitchingSig_SPV"/>
+          <Description textId="TD_vSSP_SSC2_SPV"/>
+        </Variable>
+        <Variable id="V_SSP_SSC2_SPC-t0" index="63" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stSetpointConfig0"/>
+          <RecordItemInfo subindex="1" defaultValue="0"/>
+          <RecordItemInfo subindex="2" defaultValue="2"/>
+          <RecordItemInfo subindex="3" defaultValue="0"/>
+          <Name textId="TN_vSSP_SSC2_SPConfig"/>
+          <Description textId="TD_vSSP_SSC2_SPConfig"/>
+        </Variable>
+        <Variable id="V_SSP_TI_Select-t0" index="58" accessRights="rw" defaultValue="0" excludedFromDataStorage="true" modifiesOtherVariables="true">
+          <DatatypeRef datatypeId="D_u8TeachSelect"/>
+          <Name textId="TN_vSSP_TI_Select"/>
+          <Description textId="TD_vSSP_TI_Select"/>
+        </Variable>
+        <Variable id="V_SSP_TI_Result-t0" index="59" accessRights="ro" dynamic="true">
+          <DatatypeRef datatypeId="D_stTeachResult2"/>
+          <RecordItemInfo subindex="1" defaultValue="0"/>
+          <RecordItemInfo subindex="2" defaultValue="0"/>
+          <RecordItemInfo subindex="3" defaultValue="0"/>
+          <Name textId="TN_vSSP_TI_Result"/>
+          <Description textId="TD_vSSP_TI_Result"/>
+        </Variable>
+        <Variable id="V_PFO_SSC1_Delay1" index="64" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stDelayTimer"/>
+          <RecordItemInfo subindex="1" defaultValue="0"/>
+          <RecordItemInfo subindex="2" defaultValue="0"/>
+          <RecordItemInfo subindex="3" defaultValue="0"/>
+          <Name textId="TN_vPFS_SSC1_Delay"/>
+          <Description textId="TD_vPFS_SSC1_Delay"/>
+        </Variable>
+        <Variable id="V_PFO_SSC2_Delay1" index="65" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stDelayTimer"/>
+          <RecordItemInfo subindex="1" defaultValue="0"/>
+          <RecordItemInfo subindex="2" defaultValue="0"/>
+          <RecordItemInfo subindex="3" defaultValue="0"/>
+          <Name textId="TN_vPFS_SSC2_Delay"/>
+          <Description textId="TD_vPFS_SSC2_Delay"/>
+        </Variable>
+        <Variable id="V_PFO_SSC1_SPOffset" index="66" accessRights="rw" defaultValue="500" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_i16SetpointOffset0"/>
+          <Name textId="TN_vPFO_SSC1_SPOffset"/>
+          <Description textId="TD_vPFO_SSC1_SPOffset"/>
+        </Variable>
+        <Variable id="V_PFO_SSC2_SPOffset" index="67" accessRights="rw" defaultValue="500" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_i16SetpointOffset0"/>
+          <Name textId="TN_vPFO_SSC2_SPOffset"/>
+          <Description textId="TD_vPFO_SSC2_SPOffset"/>
+        </Variable>
+        <Variable id="V_PFO_Eval_Filter1" index="97" accessRights="rw" defaultValue="0" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_u8EvalFilter1"/>
+          <Name textId="TN_vPFO_Eval_Filter"/>
+          <Description textId="TD_vPFO_Eval_Filter"/>
+        </Variable>
+        <Variable id="V_PFO_Eval_MVOffset" index="98" accessRights="rw" defaultValue="0" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_i16MVOffset0"/>
+          <Name textId="TN_vPFO_Eval_MVOffset"/>
+          <Description textId="TD_vPFO_Eval_MVOffset"/>
+        </Variable>
+        <Variable id="V_PFS_PD_Config" index="104" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stPdConfig0"/>
+          <RecordItemInfo subindex="1" defaultValue="false"/>
+          <RecordItemInfo subindex="2" defaultValue="false"/>
+          <Name textId="TN_vPFS_PD_Config"/>
+          <Description textId="TD_vPFS_PD_Config"/>
+        </Variable>
+        <Variable id="V_PFO_IO_IQType" index="113" accessRights="rw" defaultValue="0" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_u8IQType0"/>
+          <Name textId="TN_vPFO_IO_IQType"/>
+          <Description textId="TD_vPFO_IO_IQType"/>
+        </Variable>
+        <Variable id="V_PFO_IO_OutFunc" index="117" accessRights="rw" defaultValue="0" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_u8OutFunc0"/>
+          <Name textId="TN_vPFO_IO_OutFunc"/>
+          <Description textId="TD_vPFO_IO_OutFunc"/>
+        </Variable>
+        <Variable id="V_PFO_IO_InFunc" index="118" accessRights="rw" defaultValue="0" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_u8InFunc0"/>
+          <Name textId="TN_vPFO_IO_InFunc"/>
+          <Description textId="TD_vPFO_IO_InFunc"/>
+        </Variable>
+        <Variable id="V_PFS_Event_Config" index="120" accessRights="rw" excludedFromDataStorage="false">
+          <DatatypeRef datatypeId="D_stEventConfig0"/>
+          <RecordItemInfo subindex="1" defaultValue="false"/>
+          <RecordItemInfo subindex="2" defaultValue="false"/>
+          <RecordItemInfo subindex="3" defaultValue="false"/>
+          <RecordItemInfo subindex="9" defaultValue="false"/>
+          <Name textId="TN_vPFS_Event_Config"/>
+          <Description textId="TD_vPFS_Event_Config"/>
+        </Variable>
+        <Variable id="V_PFO_Device_Control" index="125" accessRights="rw" defaultValue="0" excludedFromDataStorage="true">
+          <DatatypeRef datatypeId="D_u8DeviceControl0"/>
+          <Name textId="TN_vPFO_Device_Control"/>
+          <Description textId="TD_vPFO_Device_Control"/>
+        </Variable>
+        <Variable id="V_PFO_UI_Control" index="126" accessRights="rw" excludedFromDataStorage="true">
+          <DatatypeRef datatypeId="D_stUIControl0"/>
+          <RecordItemInfo subindex="1" defaultValue="false"/>
+          <Name textId="TN_vPFO_UI_Control"/>
+          <Description textId="TD_vPFO_UI_Control"/>
+        </Variable>
+        <Variable id="V_PFO_UI_IndicationControl" index="127" accessRights="rw" excludedFromDataStorage="true">
+          <DatatypeRef datatypeId="D_stIndicationControl0"/>
+          <RecordItemInfo subindex="1" defaultValue="false"/>
+          <Name textId="TN_vPFO_UI_IndicationControl"/>
+          <Description textId="TD_vPFO_UI_IndicationControl"/>
+        </Variable>
+        <Variable id="V_PFS_OPM_OperHour" index="224" accessRights="ro" dynamic="true">
+          <DatatypeRef datatypeId="D_u32OperatingHour"/>
+          <Name textId="TN_vPFS_OPM_OperHour"/>
+          <Description textId="TD_vPFS_OPM_OperHour"/>
+        </Variable>
+        <Variable id="V_PFS_OPM_TempInd" index="225" accessRights="ro" dynamic="true">
+          <DatatypeRef datatypeId="D_u8TempIndicator"/>
+          <Name textId="TN_vPFO_OPM_TempInd"/>
+          <Description textId="TD_vPFO_OPM_TempInd"/>
+        </Variable>
+        <Variable id="V_PFS_Device_Char" index="232" accessRights="ro">
+          <DatatypeRef datatypeId="D_stDeviceChar0"/>
+          <Name textId="TN_vPFS_Device_Char"/>
+          <Description textId="TD_vPFS_Device_Char"/>
+        </Variable>
+        <Variable id="V_PFS_MeasData" index="236" accessRights="ro" dynamic="true">
+          <DatatypeRef datatypeId="D_stMeasData2"/>
+          <Name textId="TN_vPFS_MeasData"/>
+          <Description textId="TD_vPFS_MeasData"/>
+        </Variable>
+        <Variable id="V_PFO_Device_StateFlags" index="238" accessRights="ro" dynamic="true">
+          <DatatypeRef datatypeId="D_stDeviceStateFlags0"/>
+          <RecordItemInfo subindex="1" defaultValue="0"/>
+          <RecordItemInfo subindex="2" defaultValue="0"/>
+          <Name textId="TN_vPFO_Device_StateFlags"/>
+          <Description textId="TD_vPFO_Device_StateFlags"/>
+        </Variable>
+        <Variable id="V_SSP_MDC_Descriptor" index="16512" accessRights="ro">
+          <DatatypeRef datatypeId="D_stMDC_Descriptor"/>
+          <Name textId="TN_vSSP_MDC_Descriptor"/>
+          <Description textId="TD_vSSP_MDC_Descriptor"/>
+        </Variable>
+      </VariableCollection>
+      <ProcessDataCollection>
+        <ProcessData id="P_ProcessData0">
+          <ProcessDataIn id="PI_PDI32_16I_8I_2U_2B" bitLength="32">
+            <DatatypeRef datatypeId="D_stPDI32_16I_8I_2U_2B"/>
+            <Name textId="TN_pdPDI32_16I_8I_2U_2B"/>
+          </ProcessDataIn>
+          <ProcessDataOut id="PO_PDO8_2B" bitLength="2">
+            <DatatypeRef datatypeId="D_stPDO8_2B"/>
+            <Name textId="TN_pdPDO8_2B"/>
+          </ProcessDataOut>
+        </ProcessData>
+      </ProcessDataCollection>
+      <ErrorTypeCollection>
+        <StdErrorTypeRef code="128" additionalCode="17"/>
+        <!-- Idx not avail. -->
+        <StdErrorTypeRef code="128" additionalCode="18"/>
+        <!-- Subidx not avail. -->
+        <StdErrorTypeRef code="128" additionalCode="32"/>
+        <!-- Service not avail. -->
+        <StdErrorTypeRef code="128" additionalCode="33"/>
+        <!-- Service not avail. - local control -->
+        <StdErrorTypeRef code="128" additionalCode="34"/>
+        <!-- Service not avail. - device control -->
+        <StdErrorTypeRef code="128" additionalCode="35"/>
+        <!-- Access denied -->
+        <StdErrorTypeRef code="128" additionalCode="48"/>
+        <!-- Param value out of range -->
+        <StdErrorTypeRef code="128" additionalCode="49"/>
+        <!-- Param value above limit -->
+        <StdErrorTypeRef code="128" additionalCode="50"/>
+        <!-- Param value below limit -->
+        <StdErrorTypeRef code="128" additionalCode="51"/>
+        <!-- Param length overrun -->
+        <StdErrorTypeRef code="128" additionalCode="52"/>
+        <!-- Param length underrun -->
+        <StdErrorTypeRef code="128" additionalCode="53"/>
+        <!-- Function not avail.-->
+        <StdErrorTypeRef code="128" additionalCode="54"/>
+        <!-- Function temporarily not avail -->
+        <StdErrorTypeRef code="128" additionalCode="64"/>
+        <!-- Invalid Param set -->
+        <StdErrorTypeRef code="128" additionalCode="65"/>
+        <!-- Inconsistent Param set -->
+        <ErrorType code="129" additionalCode="129">
+          <Name textId="TN_errPFO_Eval_MVOffset"/>
+          <Description textId="TD_errPFO_Eval_MVOffset"/>
+        </ErrorType>
+      </ErrorTypeCollection>
+      <EventCollection>
+        <StdEventRef code="25376"/>
+        <!-- Param error -->
+        <StdEventRef code="20496"/>
+        <!-- Hardware error -->
+        <Event code="36160" type="Warning">
+          <!-- Hex= 0x8D40 -->
+          <Name textId="TN_evPFO_Event_StabilityAlarm"/>
+          <Description textId="TD_evPFO_Event_StabilityAlarm"/>
+        </Event>
+        <Event code="36161" type="Warning">
+          <!-- Hex= 0x8D41 -->
+          <Name textId="TN_evPFO_Event_MeasInvalid"/>
+          <Description textId="TD_evPFO_Event_MeasInvalid"/>
+        </Event>
+        <Event code="36162" type="Warning">
+          <!-- Hex= 0x8D42 -->
+          <Name textId="TN_evPFO_Event_SignalError"/>
+          <Description textId="TD_evPFO_Event_SignalError"/>
+        </Event>
+        <Event code="36163" type="Warning">
+          <!-- Hex= 0x8D43 -->
+          <Name textId="TN_evPFO_Event_TempExceeded"/>
+          <Description textId="TD_evPFO_Event_TempExceeded"/>
+        </Event>
+        <Event code="36224" type="Warning">
+          <!-- Hex= 0x8D80 -->
+          <Name textId="TN_evPFO_Event_TestMode"/>
+          <Description textId="TD_evPFO_Event_TestMode"/>
+        </Event>
+      </EventCollection>
+      <UserInterface>
+        <ProcessDataRefCollection>
+          <ProcessDataRef processDataId="PI_PDI32_16I_8I_2U_2B">
+            <ProcessDataRecordItemInfo subindex="1" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <ProcessDataRecordItemInfo subindex="3"/>
+            <ProcessDataRecordItemInfo subindex="4"/>
+            <ProcessDataRecordItemInfo subindex="5"/>
+          </ProcessDataRef>
+          <ProcessDataRef processDataId="PO_PDO8_2B">
+            <ProcessDataRecordItemInfo subindex="1"/>
+            <ProcessDataRecordItemInfo subindex="2"/>
+          </ProcessDataRef>
+        </ProcessDataRefCollection>
+        <MenuCollection>
+          <Menu id="M_OR_Ident">
+            <Name textId="TN_mIdent"/>
+            <!-- top level menu -->
+            <MenuRef menuId="M_Ident_Device"/>
+            <MenuRef menuId="M_OR_Ident_User"/>
+          </Menu>
+          <Menu id="M_MSR_Ident">
+            <Name textId="TN_mIdent"/>
+            <!-- top level menu -->
+            <MenuRef menuId="M_Ident_Device"/>
+            <MenuRef menuId="M_MSR_Ident_User"/>
+            <MenuRef menuId="M_Ident_DeviceRev"/>
+          </Menu>
+          <Menu id="M_Ident_Device">
+            <Name textId="TN_mIdent_Device"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_VendorName" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_VendorText" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_ProductName" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_ProductText" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_ProductID" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_SerialNumber" accessRightRestriction="ro"/>
+          </Menu>
+          <Menu id="M_OR_Ident_User">
+            <Name textId="TN_mIdent_User"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_ApplicationSpecificTag" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_FunctionTag" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_LocationTag" accessRightRestriction="ro"/>
+          </Menu>
+          <Menu id="M_MSR_Ident_User">
+            <Name textId="TN_mIdent_User"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_ApplicationSpecificTag" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_FunctionTag" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_LocationTag" accessRightRestriction="rw"/>
+          </Menu>
+          <Menu id="M_Ident_DeviceRev">
+            <Name textId="TN_mIdent_DeviceRev"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_HardwareRevision" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_FirmwareRevision" accessRightRestriction="ro"/>
+          </Menu>
+          <Menu id="M_OR_Observe1">
+            <Name textId="TN_mObserve"/>
+            <!-- top level menu -->
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="1" accessRightRestriction="ro" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="2" accessRightRestriction="ro"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="3" accessRightRestriction="ro"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="4" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_DeviceStatus"/>
+          </Menu>
+          <Menu id="M_MSR_Observe1">
+            <Name textId="TN_mObserve"/>
+            <!-- top level menu -->
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="1" accessRightRestriction="ro" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="2" accessRightRestriction="ro"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="3" accessRightRestriction="ro"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="4" accessRightRestriction="ro"/>
+            <VariableRef variableId="V_DeviceStatus"/>
+          </Menu>
+          <Menu id="M_MSR_Diag">
+            <Name textId="TN_mDiag"/>
+            <!-- top level menu -->
+            <MenuRef menuId="M_Diag_ServiceFunc"/>
+            <MenuRef menuId="M_Diag_DevStatus"/>
+            <MenuRef menuId="M_Diag_OperInfo"/>
+            <MenuRef menuId="M_Diag_DevInfo"/>
+            <MenuRef menuId="M_Diag_ComInfo"/>
+          </Menu>
+          <Menu id="M_Diag_ServiceFunc">
+            <Name textId="TN_mDiag_ServiceFunc"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_SystemCommand">
+              <Button buttonValue="130">
+                <Description textId="TD_RestoreFactorySet"/>
+                <ActionStartedMessage textId="T_actRestoreFactorySet"/>
+              </Button>
+            </VariableRef>
+            <RecordItemRef variableId="V_PFO_UI_IndicationControl" subindex="1" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_PFO_Device_Control"/>
+          </Menu>
+          <Menu id="M_Diag_DevStatus">
+            <Name textId="TN_mDiag_DevStatus"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_DeviceStatus"/>
+            <VariableRef variableId="V_DetailedDeviceStatus"/>
+            <RecordItemRef variableId="V_PFO_Device_StateFlags" subindex="1"/>
+            <RecordItemRef variableId="V_PFO_Device_StateFlags" subindex="2"/>
+          </Menu>
+          <Menu id="M_Diag_OperInfo">
+            <Name textId="TN_mDiag_OperInfo"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_PFS_OPM_OperHour" accessRightRestriction="ro" displayFormat="Dec.0" gradient="1.0" offset="0.0" unitCode="1059"/>
+            <VariableRef variableId="V_PFS_OPM_TempInd" accessRightRestriction="ro"/>
+          </Menu>
+          <Menu id="M_Diag_DevInfo">
+            <Name textId="TN_mDiag_DevInfo"/>
+            <!-- level 2 menu -->
+            <RecordItemRef variableId="V_PFS_Device_Char" subindex="1" accessRightRestriction="ro" displayFormat="Dec.0" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_PFS_Device_Char" subindex="2" accessRightRestriction="ro" displayFormat="Dec.0" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_PFS_Device_Char" subindex="3" accessRightRestriction="ro" displayFormat="Dec.0" gradient="1.0" offset="0.0" unitCode="1211"/>
+            <VariableRef variableId="V_PFO_IO_Feature"/>
+            <VariableRef variableId="V_SSP_MDC_Descriptor"/>
+          </Menu>
+          <Menu id="M_Diag_ComInfo">
+            <Name textId="TN_mDiag_ComInfo"/>
+            <!-- level 2 menu -->
+            <RecordItemRef variableId="V_DirectParameters_1" subindex="3"/>
+            <RecordItemRef variableId="V_DirectParameters_1" subindex="2"/>
+            <RecordItemRef variableId="V_DirectParameters_1" subindex="5"/>
+          </Menu>
+          <Menu id="M_MSR_Param">
+            <Name textId="TN_mParam"/>
+            <!-- top level menu -->
+            <MenuRef menuId="M_Param_Oper"/>
+            <MenuRef menuId="M_Param_TeachIn"/>
+            <MenuRef menuId="M_Param_ConfOper"/>
+            <MenuRef menuId="M_Param_ConfPd"/>
+            <MenuRef menuId="M_Param_ConfEvent"/>
+            <MenuRef menuId="M_Param_ConfIO2">
+              <Condition variableId="V_PFO_IO_Feature" value="2"/>
+            </MenuRef>
+            <MenuRef menuId="M_Param_DeviceAccess"/>
+          </Menu>
+          <Menu id="M_Param_Oper">
+            <Name textId="TN_mParam_Oper"/>
+            <!-- level 2 menu -->
+            <MenuRef menuId="M_Param_OperSSC1"/>
+            <MenuRef menuId="M_Param_OperSSC2"/>
+          </Menu>
+          <Menu id="M_Param_OperSSC1">
+            <Name textId="TN_mParam_OperSSC1"/>
+            <!-- level 3 menu -->
+            <RecordItemRef variableId="V_SSP_SSC1_SPV-t0" subindex="1" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_SSP_SSC1_SPV-t0" subindex="2" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_SSP_SSC1_SPC-t0" subindex="1" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_SSP_SSC1_SPC-t0" subindex="2" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_SSP_SSC1_SPC-t0" subindex="3" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_PFO_SSC1_SPOffset" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+          </Menu>
+          <Menu id="M_Param_OperSSC2">
+            <Name textId="TN_mParam_OperSSC2"/>
+            <!-- level 3 menu -->
+            <RecordItemRef variableId="V_SSP_SSC2_SPV-t0" subindex="1" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_SSP_SSC2_SPV-t0" subindex="2" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_SSP_SSC2_SPC-t0" subindex="1" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_SSP_SSC2_SPC-t0" subindex="2" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_SSP_SSC2_SPC-t0" subindex="3" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_PFO_SSC2_SPOffset" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+          </Menu>
+          <Menu id="M_Param_TeachIn">
+            <Name textId="TN_mParam_TeachIn"/>
+            <!-- level 2 menu -->
+            <MenuRef menuId="M_Param_TeachInSV"/>
+            <RecordItemRef variableId="V_PFS_MeasData" subindex="5" accessRightRestriction="ro" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <RecordItemRef variableId="V_PFO_UI_Control" subindex="1" accessRightRestriction="rw"/>
+          </Menu>
+          <Menu id="M_Param_TeachInSV">
+            <Name textId="TN_mParam_TeachInSV"/>
+            <!-- level 3 menu -->
+            <VariableRef variableId="V_SSP_TI_Select-t0" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_SystemCommand">
+              <Button buttonValue="65">
+                <Description textId="TD_TIsp1"/>
+                <ActionStartedMessage textId="T_actTIsp1"/>
+              </Button>
+            </VariableRef>
+            <VariableRef variableId="V_SystemCommand">
+              <Button buttonValue="66">
+                <Description textId="TD_TIsp2"/>
+                <ActionStartedMessage textId="T_actTIsp2"/>
+              </Button>
+            </VariableRef>
+            <RecordItemRef variableId="V_SSP_TI_Result-t0" subindex="1" accessRightRestriction="ro"/>
+          </Menu>
+          <Menu id="M_Param_TeachInMVOffset">
+            <Name textId="TN_mParam_TeachInMVOffset"/>
+            <!-- level 3 menu -->
+            <VariableRef variableId="V_SystemCommand">
+              <Button buttonValue="170">
+                <Description textId="TD_TImvoffset"/>
+                <ActionStartedMessage textId="T_actTImvoffset"/>
+              </Button>
+            </VariableRef>
+            <RecordItemRef variableId="V_SSP_TI_Result-t0" subindex="1" accessRightRestriction="ro"/>
+          </Menu>
+          <Menu id="M_Param_ConfOper">
+            <Name textId="TN_mParam_ConfOper"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_PFO_Eval_Filter1" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_PFO_Eval_MVOffset" accessRightRestriction="rw" displayFormat="Dec.1" gradient="0.1" offset="0.0" unitCode="1013"/>
+            <MenuRef menuId="M_Param_TeachInMVOffset"/>
+            <MenuRef menuId="M_Param_ConfSSC1"/>
+            <MenuRef menuId="M_Param_ConfSSC2"/>
+          </Menu>
+          <Menu id="M_Param_ConfSSC1">
+            <Name textId="TN_mParam_ConfSSC1"/>
+            <!-- level 3 menu -->
+            <RecordItemRef variableId="V_PFO_SSC1_Delay1" subindex="3" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_PFO_SSC1_Delay1" subindex="1" accessRightRestriction="rw" displayFormat="Dec.0" gradient="1.0" offset="0.0" unitCode="1056"/>
+            <RecordItemRef variableId="V_PFO_SSC1_Delay1" subindex="2" accessRightRestriction="rw" displayFormat="Dec.0" gradient="1.0" offset="0.0" unitCode="1056"/>
+          </Menu>
+          <Menu id="M_Param_ConfSSC2">
+            <Name textId="TN_mParam_ConfSSC2"/>
+            <!-- level 3 menu -->
+            <RecordItemRef variableId="V_PFO_SSC2_Delay1" subindex="3" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_PFO_SSC2_Delay1" subindex="1" accessRightRestriction="rw" displayFormat="Dec.0" gradient="1.0" offset="0.0" unitCode="1056"/>
+            <RecordItemRef variableId="V_PFO_SSC2_Delay1" subindex="2" accessRightRestriction="rw" displayFormat="Dec.0" gradient="1.0" offset="0.0" unitCode="1056"/>
+          </Menu>
+          <Menu id="M_Param_ConfPd">
+            <Name textId="TN_mParam_ConfPd"/>
+            <!-- level 2 menu -->
+            <RecordItemRef variableId="V_PFS_PD_Config" subindex="1" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_PFS_PD_Config" subindex="2" accessRightRestriction="rw"/>
+          </Menu>
+          <Menu id="M_Param_ConfEvent">
+            <Name textId="TN_mParam_ConfEvent"/>
+            <!-- level 2 menu -->
+            <RecordItemRef variableId="V_PFS_Event_Config" subindex="2" accessRightRestriction="rw"/>
+            <RecordItemRef variableId="V_PFS_Event_Config" subindex="9" accessRightRestriction="rw"/>
+          </Menu>
+          <Menu id="M_Param_ConfIO2">
+            <Name textId="TN_mParam_ConfIO"/>
+            <!-- level 2 menu -->
+            <VariableRef variableId="V_PFO_IO_IQType" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_PFO_IO_OutFunc" accessRightRestriction="rw"/>
+            <VariableRef variableId="V_PFO_IO_InFunc" accessRightRestriction="rw"/>
+          </Menu>
+          <Menu id="M_Param_DeviceAccess">
+            <Name textId="TN_mParam_DeviceAccess"/>
+            <!-- level 3 menu -->
+            <RecordItemRef variableId="V_DeviceAccessLocks" subindex="3" accessRightRestriction="rw"/>
+          </Menu>
+        </MenuCollection>
+        <ObserverRoleMenuSet>
+          <IdentificationMenu menuId="M_OR_Ident"/>
+          <ObservationMenu menuId="M_OR_Observe1"/>
+        </ObserverRoleMenuSet>
+        <MaintenanceRoleMenuSet>
+          <IdentificationMenu menuId="M_MSR_Ident"/>
+          <ParameterMenu menuId="M_MSR_Param"/>
+          <ObservationMenu menuId="M_MSR_Observe1"/>
+          <DiagnosisMenu menuId="M_MSR_Diag"/>
+        </MaintenanceRoleMenuSet>
+        <SpecialistRoleMenuSet>
+          <IdentificationMenu menuId="M_MSR_Ident"/>
+          <ParameterMenu menuId="M_MSR_Param"/>
+          <ObservationMenu menuId="M_MSR_Observe1"/>
+          <DiagnosisMenu menuId="M_MSR_Diag"/>
+        </SpecialistRoleMenuSet>
+      </UserInterface>
+    </DeviceFunction>
+  </ProfileBody>
+  <CommNetworkProfile xsi:type="IOLinkCommNetworkProfileT" iolinkRevision="V1.1" compatibleWith="V1.0">
+    <TransportLayers>
+      <PhysicalLayer bitrate="COM2" minCycleTime="3000" sioSupported="true" mSequenceCapability="25">
+        <Connection xsi:type="CableConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_q2_4pol-con-pic.png">
+          <ProductRef productId="295670-100132"/>
+          <Description textId="TD_ProductConnector_295670-100132"/>
+          <Wire1 function="L+" color="BN">
+            <Name textId="TN_CableWire1"/>
+          </Wire1>
+          <Wire2 function="C/Q" color="BK">
+            <Name textId="TN_CableWire2"/>
+          </Wire2>
+          <Wire3 function="L-" color="BU">
+            <Name textId="TN_CableWire3"/>
+          </Wire3>
+          <Wire4 function="Other" color="WH">
+            <Name textId="TN_CableWire4_Q2"/>
+          </Wire4>
+        </Connection>
+        <Connection xsi:type="M8ConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_na_3pol-con-pic.png">
+          <ProductRef productId="295670-100128"/>
+          <Description textId="TD_ProductConnector_295670-100128"/>
+          <Wire1/>
+          <Wire2 function="NC"/>
+          <Wire3/>
+          <Wire4/>
+        </Connection>
+        <Connection xsi:type="M8ConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_q2_4pol-con-pic.png">
+          <ProductRef productId="295670-100130"/>
+          <Description textId="TD_ProductConnector_295670-100130"/>
+          <Wire1/>
+          <Wire2 function="Other"/>
+          <Wire3/>
+          <Wire4/>
+        </Connection>
+        <Connection xsi:type="M12-4ConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_q2_4pol-con-pic.png">
+          <ProductRef productId="295670-100133"/>
+          <Description textId="TD_ProductConnector_295670-100133"/>
+          <Wire1/>
+          <Wire2 function="Other"/>
+          <Wire3/>
+          <Wire4/>
+        </Connection>
+        <Connection xsi:type="M8ConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_na_3pol-con-pic.png">
+          <ProductRef productId="295670-100129"/>
+          <Description textId="TD_ProductConnector_295670-100129"/>
+          <Wire1/>
+          <Wire2 function="NC"/>
+          <Wire3/>
+          <Wire4/>
+        </Connection>
+        <Connection xsi:type="M8ConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_q2_4pol-con-pic.png">
+          <ProductRef productId="295670-100131"/>
+          <Description textId="TD_ProductConnector_295670-100131"/>
+          <Wire1/>
+          <Wire2 function="Other"/>
+          <Wire3/>
+          <Wire4/>
+        </Connection>
+        <Connection xsi:type="M12-4ConnectionT" connectionSymbol="Pepperl-Fuchs_plug_cq_q2_4pol-con-pic.png">
+          <ProductRef productId="295670-100134"/>
+          <Description textId="TD_ProductConnector_295670-100134"/>
+          <Wire1/>
+          <Wire2 function="Other"/>
+          <Wire3/>
+          <Wire4/>
+        </Connection>
+      </PhysicalLayer>
+    </TransportLayers>
+    <Test>
+      <Config1 index="64" testValue="0x00,0x00,0x00,0x00,0x00"/>
+      <Config2 index="256" testValue="0x01,0x02,0x03,0x04"/>
+      <Config3 index="16" testValue="0x50,0x65,0x70,0x70,0x65,0x72,0x6C,0x2B,0x46,0x75,0x63,0x68,0x73"/>
+      <Config7 index="254">
+        <EventTrigger appearValue="01" disappearValue="02"/>
+        <EventTrigger appearValue="03" disappearValue="04"/>
+      </Config7>
+    </Test>
+  </CommNetworkProfile>
+  <ExternalTextCollection>
+    <PrimaryLanguage xml:lang="en">
+      <Text id="T_VendorText" value="Pepperl+Fuchs"/>
+      <Text id="T_VendorUrl" value="http://www.pepperl-fuchs.com/io-link"/>
+      <Text id="T_DeviceName" value="OMT550 R200 series"/>
+      <Text id="T_DeviceFamily" value="Distance sensor"/>
+      <Text id="TN_ProductName_295670-100132" value="OMT550-R200-2EP-IO"/>
+      <Text id="TD_ProductDescr_295670-100132" value="R200, 100 .. 550 mm, active high, configurable, Q2 output, cable 2 m, 4-pole"/>
+      <Text id="TN_ProductName_295670-100128" value="OMT550-R200-EP-IO-V3"/>
+      <Text id="TD_ProductDescr_295670-100128" value="R200, 100 .. 550 mm, active high, configurable, M8 plug, 3-pin"/>
+      <Text id="TN_ProductName_295670-100130" value="OMT550-R200-2EP-IO-V31"/>
+      <Text id="TD_ProductDescr_295670-100130" value="R200, 100 .. 550 mm, active high, configurable, Q2 output, M12 plug, 4-pin"/>
+      <Text id="TN_ProductName_295670-100133" value="OMT550-R200-2EP-IO-V1"/>
+      <Text id="TD_ProductDescr_295670-100133" value="R200, 100 .. 550 mm, active high, configurable, Q2 output, M8 plug, 4-pin"/>
+      <Text id="TN_ProductName_295670-100129" value="OMT550-R200-EP-IO-0,3M-V3"/>
+      <Text id="TD_ProductDescr_295670-100129" value="R200, 100 .. 550 mm, active high, configurable, M8 pigtail, 3-pin"/>
+      <Text id="TN_ProductName_295670-100131" value="OMT550-R200-2EP-IO-0,3M-V31"/>
+      <Text id="TD_ProductDescr_295670-100131" value="R200, 100 .. 550 mm, active high, configurable, Q2 output, M8 pigtail, 4-pin"/>
+      <Text id="TN_ProductName_295670-100134" value="OMT550-R200-2EP-IO-0,3M-V1"/>
+      <Text id="TD_ProductDescr_295670-100134" value="R200, 100 .. 550 mm, active high, configurable, Q2 output, M12 pigtail, 4-pin"/>
+      <Text id="TD_ProductConnector_295670-100132" value="cable, 4-pole"/>
+      <Text id="TD_ProductConnector_295670-100128" value="plug, M8, 3-pin"/>
+      <Text id="TD_ProductConnector_295670-100130" value="plug, M8, 4-pin"/>
+      <Text id="TD_ProductConnector_295670-100133" value="plug, M12, 4-pin"/>
+      <Text id="TD_ProductConnector_295670-100129" value="pigtail, M8, 3-pin"/>
+      <Text id="TD_ProductConnector_295670-100131" value="pigtail, M8, 4-pin"/>
+      <Text id="TD_ProductConnector_295670-100134" value="pigtail, M12, 4-pin"/>
+      <Text id="TN_CableWire1" value="Brown - +24V"/>
+      <Text id="TN_CableWire2" value="Black - C/Q"/>
+      <Text id="TN_CableWire3" value="Blue  - 0V"/>
+      <Text id="TN_CableWire4_Q2" value="White - Q2"/>
+      <Text id="TN_pdPDI32_16I_8I_2U_2B" value="PD Input"/>
+      <Text id="TN_vSSP_MeasValue" value="MV - Distance"/>
+      <Text id="TD_vSSP_MeasValue" value="shows the current measurement value"/>
+      <Text id="TN_svSSP_MeasValue_nodata" value="No Measurement Data"/>
+      <Text id="TN_svSSP_MeasValue_belowrange" value="Out of Range - Below Range"/>
+      <Text id="TN_svSSP_MeasValue_aboverange" value="Out of Range - Above Range"/>
+      <Text id="TN_vSSP_Scale" value="Scale"/>
+      <Text id="TN_vSSP_SSC1_SwitchingSig" value="SSC1 - Switching Signal 1"/>
+      <Text id="TD_vSSP_SSC1_SwitchingSig" value="current status of the switching signal 1"/>
+      <Text id="TN_vSSP_SSC2_SwitchingSig" value="SSC2 - Switching Signal 2"/>
+      <Text id="TD_vSSP_SSC2_SwitchingSig" value="current status of the switching signal 2"/>
+      <Text id="TN_vPFO_SQIValue" value="Signal Quality Indicator"/>
+      <Text id="TD_vPFO_SQIValue" value="quality of the evaluated sensor signal, quality drops with weak signal or interference"/>
+      <Text id="TN_svPFO_SQIValue_insufficient" value="Insufficient"/>
+      <Text id="TN_svPFO_SQIValue_acceptable" value="Acceptable"/>
+      <Text id="TN_svPFO_SQIValue_good" value="Good"/>
+      <Text id="TN_svPFO_SQIValue_excellent" value="Excellent"/>
+      <Text id="TN_vPFO_TIValue" value="Teach-in Value"/>
+      <Text id="TD_vPFO_TIValue" value="value for the setpoint acquired via a teach-in process"/>
+      <Text id="TN_pdPDO8_2B" value="PD Output"/>
+      <Text id="TN_vSSP_CSC1" value="CSC1 - Transducer Disable"/>
+      <Text id="TN_vPFO_CSC2" value="CSC2 - Evaluation Hold"/>
+      <Text id="TN_svState_active" value="Active"/>
+      <Text id="TN_svState_inactive" value="Inactive"/>
+      <Text id="TN_svEnDisable_disable" value="Disabled"/>
+      <Text id="TN_svEnDisable_enable" value="Enabled"/>
+      <Text id="TN_svOnOff_off" value="Off"/>
+      <Text id="TN_svOnOff_on" value="On"/>
+      <Text id="TN_svSSP_Logic_highactive" value="High active - Not Inverted"/>
+      <Text id="TN_svSSP_Logic_lowactive" value="Low active - Inverted"/>
+      <Text id="TN_vFunctionTag" value="Function Tag"/>
+      <Text id="TD_vFunctionTag" value="provides additional tagging posibilities e.g. for a application or job configuration"/>
+      <Text id="TN_vLocationTag" value="Location Tag"/>
+      <Text id="TD_vLocationTag" value="provides additional tagging posibilities for location of the device"/>
+      <Text id="TN_svSSP_SysCmd_TIsvsp1" value="Teach SP1"/>
+      <Text id="TN_svSSP_SysCmd_TIsvsp2" value="Teach SP2"/>
+      <Text id="TN_svPFO_SysCmd_TIsvmeasoffs" value="Teach Measurement Offset"/>
+      <Text id="TN_vSSP_TI_Select" value="TI - Select"/>
+      <Text id="TD_vSSP_TI_Select" value="shows the current state and progress of a teach-in process"/>
+      <Text id="TN_svSSP_TI_Select_default" value="Default Channel - SSC1"/>
+      <Text id="TN_svSSP_TI_Select_ssc1" value="SSC1"/>
+      <Text id="TN_svSSP_TI_Select_ssc2" value="SSC2"/>
+      <Text id="TN_vSSP_TI_Result" value="TI - Result"/>
+      <Text id="TD_vSSP_TI_Result" value="shows the current state and progress of a teach-in process"/>
+      <Text id="TN_vSSP_TI_Result_State" value="State"/>
+      <Text id="TN_svSSP_TI_Result_State_idle" value="Idle"/>
+      <Text id="TN_svSSP_TI_Result_State_success_sp1" value="SP1 Success"/>
+      <Text id="TN_svSSP_TI_Result_State_success_sp2" value="SP2 Success"/>
+      <Text id="TN_svSSP_TI_Result_State_success_sp12" value="SP12 Success"/>
+      <Text id="TN_svSSP_TI_Result_State_waitforcmd" value="Wait for command"/>
+      <Text id="TN_svSSP_TI_Result_State_busy" value="Busy"/>
+      <Text id="TN_svSSP_TI_Result_State_error" value="Error"/>
+      <Text id="TN_svPFO_TI_Result_State_success_mvoffset" value="MeasOffset Success"/>
+      <Text id="TN_vSSP_TI_Result_Sp1Tp1" value="Flag SP1 TP1"/>
+      <Text id="TN_vSSP_TI_Result_Sp1Tp2" value="Flag SP1 TP2"/>
+      <Text id="TN_vSSP_TI_Result_Sp2Tp1" value="Flag SP2 TP1"/>
+      <Text id="TN_vSSP_TI_Result_Sp2Tp2" value="Flag SP2 TP2"/>
+      <Text id="TN_svSSP_TI_Flag_TPna" value="Initial or not ok"/>
+      <Text id="TN_svSSP_TI_Flag_TPsuccess" value="OK"/>
+      <Text id="TN_vSSP_SSC1_SwitchingSig_SPV" value="SSC1 Param"/>
+      <Text id="TD_vSSP_SSC1_SPV" value="setpoint values for switching signal channel 1"/>
+      <Text id="TN_vSSP_SSC2_SwitchingSig_SPV" value="SSC2 Param"/>
+      <Text id="TD_vSSP_SSC2_SPV" value="setpoint values for switching signal channel 2"/>
+      <Text id="TN_vSSP_SSCn_SP1" value="SP1"/>
+      <Text id="TD_vSSP_SSCn_SP1" value="setpoint 1 value for switching signal channel"/>
+      <Text id="TN_vSSP_SSCn_SP2" value="SP2"/>
+      <Text id="TD_vSSP_SSCn_SP2" value="setpoint 2 value for switching signal channel"/>
+      <Text id="TN_vSSP_SSC1_SPConfig" value="SSC1 Config"/>
+      <Text id="TD_vSSP_SSC1_SPConfig" value="configuration parameter for switching signal channel 1"/>
+      <Text id="TN_vSSP_SSC2_SPConfig" value="SSC2 Config"/>
+      <Text id="TD_vSSP_SSC2_SPConfig" value="configuration parameter for switching signal channel 2"/>
+      <Text id="TN_vSSP_SSCn_Logic" value="Logic"/>
+      <Text id="TD_vSSP_SSCn_Logic" value="defines the logical behaviour of the switching signal and derived output signal"/>
+      <Text id="TN_vSSP_SSCn_Mode" value="Mode"/>
+      <Text id="TD_vSSP_SSCn_Mode" value="defines the evaluation behaviour of the switching signal and derived output signal"/>
+      <Text id="TN_svSSP_SSC_Mode_inactive" value="Deactivated"/>
+      <Text id="TN_svSSP_SSC_Mode_singlepoint" value="Single point"/>
+      <Text id="TN_svSSP_SSC_Mode_window" value="Window"/>
+      <Text id="TN_svSSP_SSC_Mode_twopoint" value="Two point"/>
+      <Text id="TN_svPFO_SSC_Mode_centerwindow" value="Centered window"/>
+      <!--			<Text id="TN_svPFO_SSC_Mode_bgs" value="BGS mode"/>
+			<Text id="TN_svPFO_SSC_Mode_bge" value="BGE mode"/>
+			-->
+      <Text id="TN_vSSP_SSCn_SPHys" value="Hysteresis"/>
+      <Text id="TD_vSSP_SSCn_SPHys" value="a higher hysteresis may help to increase stability in critical applications"/>
+      <Text id="TN_svPFO_SSC_SPHys_std" value="Standard"/>
+      <Text id="TN_svPFO_SSC_SPHys_alt" value="High"/>
+      <Text id="TN_vPFS_SSC1_Delay" value="SSC1 Config - Delay Timer"/>
+      <Text id="TD_vPFS_SSC1_Delay" value="configuration of switching delay functions and times for switching channel 1"/>
+      <Text id="TN_vPFS_SSC2_Delay" value="SSC2 Config - Delay Timer"/>
+      <Text id="TD_vPFS_SSC2_Delay" value="configuration of switching delay functions and times for switching channel 1"/>
+      <Text id="TN_svPFO_SSC_DelayMode_onoffdly" value="On / Off delay"/>
+      <Text id="TN_svPFO_SSC_DelayMode_ondlyoneshot" value="On delay / One shot"/>
+      <Text id="TN_svPFS_SSC_DelayTime_inactive" value="Disabled"/>
+      <Text id="TN_vPFS_SSCn_OffDelay" value="Off Delay / One Shot Delay"/>
+      <Text id="TD_vPFS_SSCn_OffDelay" value="defines the switching delay for a on-to-off transition or the minimum on time after a off-to-on transition of the switching signal depending on the delay mode setting'"/>
+      <Text id="TN_vPFS_SSCn_OnDelay" value="On Delay"/>
+      <Text id="TD_vPFS_SSCn_OnDelay" value="defines switching delay for a off-to-on transition of the switching signal"/>
+      <Text id="TN_vPFO_SSCn_DelayMode" value="Mode"/>
+      <Text id="TD_vPFO_SSCn_DelayMode" value="selects between a combination of 'on' and 'off' delay times or 'on' and 'one-shot' delay times"/>
+      <Text id="TN_vPFO_SSC1_SPOffset" value="SSC1 Config - SP Offset"/>
+      <Text id="TD_vPFO_SSC1_SPOffset" value="the setpoint offset defines the switchpoint of the sensor relative to the setpoint"/>
+      <Text id="TN_vPFO_SSC2_SPOffset" value="SSC2 Config - SP Offset"/>
+      <Text id="TD_vPFO_SSC2_SPOffset" value="the setpoint offset defines the switchpoint of the sensor relative to the setpoint"/>
+      <Text id="TN_vPFO_Eval_Filter" value="Eval Config - Signal Filter"/>
+      <Text id="TD_vPFO_Eval_Filter" value="configuration of filtering may help solve critical applications"/>
+      <Text id="TN_svPFO_Eval_Filter_factorx1" value="Filter x1"/>
+      <Text id="TN_svPFO_Eval_Filter_factorx2" value="Filter x2"/>
+      <Text id="TN_svPFO_Eval_Filter_factorx4" value="Filter x4"/>
+      <Text id="TN_svPFO_Eval_Filter_factorx16" value="Filter x16"/>
+      <Text id="TN_svPFO_Eval_Filter_factorx64" value="Filter x64"/>
+      <Text id="TN_svPFO_Eval_Filter_factorx256" value="Filter x256"/>
+      <Text id="TN_vPFO_Eval_MVOffset" value="Eval Config - Measurement Offset"/>
+      <Text id="TD_vPFO_Eval_MVOffset" value="offset for calibration of zero reference for a certain mounting situation"/>
+      <Text id="TN_vPFO_IO_IQType" value="I/O Config - I/Q Type"/>
+      <Text id="TD_vPFO_IO_IQType" value="configures the output or input characteristic at pin 2 or white wire"/>
+      <Text id="TN_svPFO_IO_Type_def" value="Factory default"/>
+      <Text id="TN_svPFO_IO_Type_pp" value="Output - Push-pull"/>
+      <Text id="TN_svPFO_IO_Type_hz" value="High impedance"/>
+      <Text id="TN_svPFO_IO_Type_highactive" value="Input - active high"/>
+      <Text id="TN_svPFO_IO_Type_lowactive" value="Input - active low"/>
+      <Text id="TN_vPFO_IO_OutFunc" value="I/O Config - Output Function"/>
+      <Text id="TD_vPFO_IO_OutFunc" value="configuration of the specific function at the additional I/O terminal if configured as output"/>
+      <Text id="TN_vPFO_IO_InFunc" value="I/O Config - Input Function"/>
+      <Text id="TD_vPFO_IO_InFunc" value="configuration of the specific function at the additional I/O terminal if configured as input"/>
+      <Text id="TN_svPFO_IO_OutFunc_def" value="Factory default"/>
+      <Text id="TN_svPFO_IO_OutFunc_antivalent" value="Antivalent"/>
+      <Text id="TN_svPFO_IO_OutFunc_equivalent" value="Equivalent"/>
+      <Text id="TN_svPFO_IO_OutFunc_ssc2" value="SSC2 - Switching Signal 2"/>
+      <Text id="TN_svPFO_IO_OutFunc_constant" value="Inactive (constant)"/>
+      <Text id="TN_svPFO_IO_InFunc_def" value="Factory default"/>
+      <Text id="TN_svPFO_IO_InFunc_test" value="Test mode"/>
+      <Text id="TN_svPFO_IO_InFunc_teach" value="Teach-in"/>
+      <Text id="TN_vPFS_PD_Config" value="PD Config"/>
+      <Text id="TD_vPFS_PD_Config" value="allows enabling or disabling specific functions controlled by PD Output"/>
+      <Text id="TN_vPFS_PD_Config_CSC1" value="Emitter Control"/>
+      <Text id="TD_vPFS_PD_Config_CSC1" value="enabled: the emitter is controlled via process data output - a '1' at 'PD Output - Tansducer disable' disables the emitter, object detection is inhibited"/>
+      <Text id="TN_vPFS_PD_Config_CSC2" value="Evaluation Hold"/>
+      <Text id="TD_vPFS_PD_Config_CSC2" value="enabled: the signal evaluation is controlled via process data output - a '1' at 'PDoutput - Evaluation Hold' stops signal evaluation, the last state will be maintained"/>
+      <Text id="TN_vPFS_Event_Config" value="Event Config"/>
+      <Text id="TD_vPFS_Event_Config" value="different event sources can be en- or disabled"/>
+      <Text id="TN_vPFS_Event_Config_StabilityAlarm" value="Warning: Stability Alarm"/>
+      <Text id="TD_vPFS_Event_Config_StabilityAlarm" value="enabled: an event is generated if operating reserve is below configured threshold at parameter 'Operating Reserve'"/>
+      <Text id="TN_vPFS_Event_Config_MeasInvalid" value="Warning: Invalid Measurement"/>
+      <Text id="TD_vPFS_Event_Config_MeasInvalid" value="enabled: an event is generated if sensor signals do not allow a valid evaluation"/>
+      <Text id="TN_vPFS_Event_Config_SignalError" value="Warning: Signal Error"/>
+      <Text id="TD_vPFS_Event_Config_SignalError" value="enabled: an event is generated if sensor signals are not valid due to e.g. heavy interferences"/>
+      <Text id="TN_vPFS_Event_Config_TestMode" value="Warning: Test Mode"/>
+      <Text id="TD_vPFS_Event_Config_TestMode" value="enabled: an event is generated if the emitter is set to test mode (turned off, transducer disable) by a remote signal"/>
+      <Text id="TN_vPFO_Device_Control" value="Device Operation"/>
+      <Text id="TD_vPFO_Device_Control" value="allows setting the device into different operational states e.g. for diagnosis purposes"/>
+      <Text id="TN_svPFO_Device_Control_normal" value="Normal operation"/>
+      <Text id="TN_svPFO_Device_Control_transducerdisable" value="Transducer disable - Emitter off"/>
+      <Text id="TN_vPFO_UI_Control" value="UI Control"/>
+      <Text id="TD_vPFO_UI_Control" value="UI Control"/>
+      <Text id="TN_vPFO_UI_Control_LocalControl" value="Local Control (in IO-Link mode)"/>
+      <Text id="TD_vPFO_UI_Control_LocalControl" value="enables temporary adjustment or teach-in over local control elements"/>
+      <Text id="TN_vPFO_UI_IndicationControl" value="Indication Control"/>
+      <Text id="TD_vPFO_UI_IndicationControl" value="Indication Control"/>
+      <Text id="TN_vPFO_UI_IndicationControl_Locator" value="Locator Indication"/>
+      <Text id="TD_vPFO_UI_IndicationControl_Locator" value="enables a defined flashing pattern of the indicator LEDs for better spotting a sensor in field application"/>
+      <Text id="TN_vPFS_OPM_OperHour" value="Operating Hours"/>
+      <Text id="TD_vPFS_OPM_OperHour" value="shows the overall hours of operation"/>
+      <Text id="TN_vPFO_OPM_TempInd" value="Temperature Indicator"/>
+      <Text id="TD_vPFO_OPM_TempInd" value="indicates operation at critical ambient temperatures or excess of specification limits"/>
+      <Text id="TN_svPFO_OPM_TempIndicator_safe" value="Safe operation temperature"/>
+      <Text id="TN_svPFO_OPM_TempIndicator_criticalhigh" value="Critical high ambient temperature"/>
+      <Text id="TN_svPFO_OPM_TempIndicator_overtemp" value="Temperature above specified limit"/>
+      <Text id="TN_svPFO_OPM_TempIndicator_criticallow" value="Critical low ambient temperature"/>
+      <Text id="TN_svPFO_OPM_TempIndicator_undertemp" value="Temperature below specified limit"/>
+      <Text id="TN_vPFS_Device_Char" value="Device Characteristic"/>
+      <Text id="TD_vPFS_Device_Char" value="key characteristics for device operation"/>
+      <Text id="TN_vPFS_Device_Char_DetectRngMin" value="Min. Detection Range"/>
+      <Text id="TD_vPFS_Device_Char_DetectRngMin" value="the minimum value of the specified detection range"/>
+      <Text id="TN_vPFS_Device_Char_DetectRngMax" value="Max. Detection Range"/>
+      <Text id="TD_vPFS_Device_Char_DetectRngMax" value="the maximum value of the specified detection range"/>
+      <Text id="TN_vPFS_Device_Char_SupplyCurrMax" value="Supply Current"/>
+      <Text id="TD_vPFS_Device_Char_SupplyCurrMax" value="the maximum specified supply current excluding load"/>
+      <Text id="TN_vPFS_MeasData" value="Measurement Data"/>
+      <Text id="TD_vPFS_MeasData" value="Measurement Data"/>
+      <Text id="TN_vPFO_Device_StateFlags" value="Device Operation"/>
+      <Text id="TD_vPFO_Device_StateFlags" value="current sensor state information"/>
+      <Text id="TN_vPFO_Device_State_TransducerDis" value="Emitter State"/>
+      <Text id="TD_vPFO_Device_State_TransducerDis" value="true: emitter is disabled, object detection is inhibited"/>
+      <Text id="TN_vPFO_Device_State_LocalCntrl" value="Local Control State (in IO-Link mode)"/>
+      <Text id="TD_vPFO_Device_State_LocalCntrl" value="true: local controls are temporarily enabled for adjustment or teach-in in IO-Link mode"/>
+      <Text id="TN_vSSP_MDC_Descriptor" value="MDC Descr"/>
+      <Text id="TD_vSSP_MDC_Descriptor" value="descriptor for interpretation of the measurement data channel (process data MV)"/>
+      <Text id="TN_vSSP_MDC_Descriptor_LowerLimit" value="Lower Limit"/>
+      <Text id="TD_vSSP_MDC_Descriptor_LowerLimit" value="lower value of measurement range"/>
+      <Text id="TN_vSSP_MDC_Descriptor_UpperLimit" value="Upper Limit"/>
+      <Text id="TD_vSSP_MDC_Descriptor_UpperLimit" value="upper value of measurement range"/>
+      <Text id="TN_vSSP_MDC_Descriptor_UnitCode" value="Unit Code"/>
+      <Text id="TD_vSSP_MDC_Descriptor_UnitCode" value="unique code for physical unit"/>
+      <Text id="TN_vSSP_MDC_Descriptor_Scale" value="Scale"/>
+      <Text id="TD_vSSP_MDC_Descriptor_Scale" value="multiplier for measurement value - 10exp(scale)"/>
+      <Text id="TN_vPFO_IO_Feature" value="I/O Feature"/>
+      <Text id="TD_vPFO_IO_Feature" value="descriptor for the available features at the electrical interface"/>
+      <Text id="TN_svPFO_IO_Feature_cq" value="No additional I/O terminals available"/>
+      <Text id="TN_svPFO_IO_Feature_cqao" value="Analog output on pin 2 / white wire"/>
+      <Text id="TN_svPFO_IO_Feature_cqiq" value="Second signal in- / output on pin 2 / white wire"/>
+      <Text id="TN_svPFO_IO_Feature_cqiqao" value="Second signal in- / output / analog output on pin 2 / white wire"/>
+      <Text id="TN_svPFO_IO_Feature_cqaoin" value="Analog output on pin 2/wh, input signal on pin 5 / grey wire"/>
+      <Text id="TN_svPFO_IO_Feature_cqiqin" value="Second signal output on pin 2 / white, input signal on pin 5 / grey wire"/>
+      <Text id="TN_svPFO_IO_Feature_cqiqaoin" value="Second signal / analog output on pin 2 / white, input signal on pin 5 / grey wire"/>
+      <Text id="TN_errPFO_Eval_MVOffset" value="Invalid combination of setpoint and measurement offset values"/>
+      <Text id="TD_errPFO_Eval_MVOffset" value="measurement offset and setpoint setting result in a switchpoint outside of the specified detection range, check values"/>
+      <Text id="TN_evPFO_Event_StabilityAlarm" value="Stability alarm - operating reserve too low"/>
+      <Text id="TD_evPFO_Event_StabilityAlarm" value="Check sensor adjustment or clean surface"/>
+      <Text id="TN_evPFO_Event_MeasInvalid" value="Measurement not possible, invalid data"/>
+      <Text id="TD_evPFO_Event_MeasInvalid" value="Check sensor adjustment or target position"/>
+      <Text id="TN_evPFO_Event_SignalError" value="Signal acquisition disturbed"/>
+      <Text id="TD_evPFO_Event_SignalError" value="Check for excessive ambient light interference"/>
+      <Text id="TN_evPFO_Event_TempExceeded" value="Ambient temperature outside specified temperature range"/>
+      <Text id="TD_evPFO_Event_TempExceeded" value="Check sensor environment"/>
+      <Text id="TN_evPFO_Event_TestMode" value="Device set to test mode (emitter off) by remote signal"/>
+      <Text id="TD_evPFO_Event_TestMode" value="Object detection is inhibited"/>
+      <Text id="TN_mIdent" value="Identification"/>
+      <Text id="TN_mIdent_Device" value="Device Information"/>
+      <Text id="TN_mIdent_User" value="Application Specific Information"/>
+      <Text id="TN_mIdent_DeviceRev" value="Revision Information"/>
+      <Text id="TN_mParam" value="Parameter"/>
+      <Text id="TN_mParam_Oper" value="Operation Parameter"/>
+      <Text id="TN_mParam_OperSSC1" value="Switching Signal Channel 1"/>
+      <Text id="TN_mParam_OperSSC2" value="Switching Signal Channel 2"/>
+      <Text id="TN_mParam_TeachIn" value="Teach-In"/>
+      <Text id="TN_mParam_TeachInSV" value="Teach-In Single Value"/>
+      <Text id="TD_TIsp1" value="Teach-In Setpoint 1"/>
+      <Text id="T_actTIsp1" value="Teach-in of setpoint 1 has been executed"/>
+      <Text id="TD_TIsp2" value="Teach-In Setpoint 2"/>
+      <Text id="T_actTIsp2" value="Teach-in of setpoint 2 has been executed"/>
+      <Text id="TN_mParam_TeachInMVOffset" value="Teach-In Measurement Offset"/>
+      <Text id="TD_TImvoffset" value="Teach-In Measurement Offset"/>
+      <Text id="T_actTImvoffset" value="Teach-in of measurement offset has been executed"/>
+      <Text id="TN_mParam_ConfOper" value="Operation Mode Configuration"/>
+      <Text id="TN_mParam_ConfSSC1" value="Switching Signal Configuration - Channel 1"/>
+      <Text id="TN_mParam_ConfSSC2" value="Switching Signal Configuration - Channel 2"/>
+      <Text id="TN_mParam_ConfPd" value="Process Data Configuration"/>
+      <Text id="TN_mParam_ConfEvent" value="Event Configuration"/>
+      <Text id="TN_mParam_ConfIO" value="I/O Configuration"/>
+      <Text id="TN_mParam_DeviceAccess" value="Device Locks"/>
+      <Text id="TN_mDiag" value="Diagnosis"/>
+      <Text id="TN_mDiag_ServiceFunc" value="Service Function"/>
+      <Text id="TD_RestoreFactorySet" value="Restore Factory Settings"/>
+      <Text id="T_actRestoreFactorySet" value="Parameters are set to factory settings"/>
+      <Text id="TN_mDiag_DevStatus" value="Device Status Information"/>
+      <Text id="TN_mDiag_OperInfo" value="Operation Information"/>
+      <Text id="TN_mDiag_ComInfo" value="Communication Characteristics"/>
+      <Text id="TN_mDiag_DevInfo" value="Device Characteristics"/>
+      <Text id="TN_mObserve" value="Observation"/>
+    </PrimaryLanguage>
+  </ExternalTextCollection>
+  <Stamp crc="505681496"><Checker name="IODD-Checker V1.1.4" version="V1.1.4.0"/></Stamp>
+</IODevice>

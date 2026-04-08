@@ -9,6 +9,7 @@ import {
 
 import {
   DEFAULT_REAL_CONNECT_REQUEST,
+  HISTORY_REFRESH_INTERVAL_MS,
   HISTORY_CHART_MAX_POINTS,
   UI_REFRESH_INTERVAL_MS,
   connectTarget,
@@ -16,6 +17,8 @@ import {
   disconnectTarget,
   fetchAllPortsHistory,
   fetchAllPortsPdi,
+  fetchConnectionStatus,
+  fetchIoddLibrary,
 } from '../api/client'
 import type {
   AllPortsHistoryResponse,
@@ -23,7 +26,11 @@ import type {
   CommunicationState,
   ConnectionDraft,
   ConnectionInfo,
+  ConnectionStatusResponse,
   DecodedPreview,
+  IoddDeviceProfile,
+  ParsedProcessDataProfile,
+  PortDiagnostic,
   PortDecodeCollection,
   PortDisplayConfig,
   PortDisplayOverride,
@@ -34,17 +41,34 @@ import type {
   PdiResponse,
 } from '../api/types'
 import {
+  applyResolutionToPreview,
+  buildDecodePreviewCacheKey,
   buildPortDecodeCollection,
   buildPreviewFromConvertedValue,
   buildUnavailablePreview,
+  decodeRegistersPreview,
   getOverviewDecodeTypes,
   prepareRegistersForDecodeRequest,
 } from '../utils/decode'
+import {
+  buildPortTrendSeries,
+  formatLocalTimeDisplay,
+  type PortTrendSeries,
+} from '../utils/history'
+import {
+  parseProcessDataPayload,
+  resolveProcessDataProfile,
+  setRuntimeProcessDataProfiles,
+} from '../utils/processDataMaps'
 import {
   loadPortDisplayOverrides,
   resolvePortDisplayConfig,
   savePortDisplayOverrides,
 } from '../utils/portDisplay'
+import {
+  buildPortDiagnostic,
+  countDiagnosticLevels,
+} from '../utils/diagnostics'
 
 export const PORT_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8]
 export const DEFAULT_HISTORY_WINDOW_MS = 30000
@@ -63,12 +87,24 @@ export interface CommunicationPresentation {
   tone: StatusTone
 }
 
+interface RefreshDashboardOptions {
+  initial?: boolean
+  allowAutoConnect?: boolean
+  force?: boolean
+  includeHistory?: boolean
+}
+
 export interface MonitoringWorkspace {
   dashboard: AllPortsPdiResponse | null
   historySnapshot: AllPortsHistoryResponse | null
   ports: PortSnapshot[]
   historyByPort: Record<number, PortHistorySeries>
+  trendSeriesByPort: Record<number, PortTrendSeries>
   featuredDecodesByPort: Record<number, DecodedPreview>
+  ioddProfiles: IoddDeviceProfile[]
+  ioddProfilesById: Record<string, IoddDeviceProfile>
+  processDataByPort: Record<number, ParsedProcessDataProfile | null>
+  diagnosticsByPort: Record<number, PortDiagnostic>
   selectedPortDecodes: PortDecodeCollection | null
   historyWindowMs: number
   portDisplayOverrides: PortDisplayOverrides
@@ -76,8 +112,12 @@ export interface MonitoringWorkspace {
   selectedPortNumber: number
   selectedPortSnapshot: PortSnapshot
   selectedPortHistory: PortHistorySeries | null
+  selectedPortTrendSeries: PortTrendSeries
+  selectedPortIoddProfile: IoddDeviceProfile | null
+  selectedPortProcessData: ParsedProcessDataProfile | null
   selectedPortOverride: PortDisplayOverride | null
   selectedPortDisplayConfig: PortDisplayConfig
+  selectedPortDiagnostic: PortDiagnostic
   connectionDraft: ConnectionDraft
   hasLoadedOnce: boolean
   isRefreshing: boolean
@@ -90,6 +130,11 @@ export interface MonitoringWorkspace {
     warning: number
     critical: number
   }
+  diagnosticCounts: {
+    normal: number
+    warning: number
+    critical: number
+  }
   connectionSummary: string
   connectionMeta: string
   backendModeLabel: ConnectionDraft['mode']
@@ -97,6 +142,7 @@ export interface MonitoringWorkspace {
   staleStateLabel: string
   staleStateTone: StatusTone
   uiRefreshMs: number
+  historyRefreshMs: number
   setHistoryWindowMs: (value: number) => void
   setSelectedPortNumber: (value: number) => void
   setConnectionDraft: (value: ConnectionDraft) => void
@@ -104,7 +150,9 @@ export interface MonitoringWorkspace {
     initial?: boolean
     allowAutoConnect?: boolean
     force?: boolean
+    includeHistory?: boolean
   }) => Promise<void>
+  refreshIoddLibrary: () => Promise<void>
   handleConnect: () => Promise<void>
   handleDisconnect: () => Promise<void>
   updatePortDisplayOverride: (portNumber: number, override: PortDisplayOverride) => void
@@ -158,6 +206,22 @@ function createEmptyHistorySeries(portNumber: number): PortHistorySeries {
   return {
     port: portNumber,
     samples: [],
+  }
+}
+
+function createEmptyTrendSeries(): PortTrendSeries {
+  return {
+    points: [],
+    latestValue: null,
+    previousValue: null,
+    delta: null,
+    minimumValue: null,
+    maximumValue: null,
+    sampleCount: 0,
+    decodeType: null,
+    status: 'unavailable',
+    oldestTimestampMs: null,
+    latestTimestampMs: null,
   }
 }
 
@@ -237,6 +301,17 @@ function preserveReferenceIfEqual<T>(previousValue: T, nextValue: T): T {
     : nextValue
 }
 
+function preserveBannerIfEqual(
+  previousBanner: BannerState,
+  nextBanner: BannerState,
+): BannerState {
+  return previousBanner.tone === nextBanner.tone &&
+    previousBanner.title === nextBanner.title &&
+    previousBanner.body === nextBanner.body
+    ? previousBanner
+    : nextBanner
+}
+
 function mergePortSnapshots(
   previousSnapshots: PortSnapshot[],
   nextSnapshots: PortSnapshot[],
@@ -272,10 +347,54 @@ function mergePortHistory(
     const previousSeries = previousHistory[portNumber]
     const nextSeries = nextHistory[portNumber]
 
-    mergedHistory[portNumber] =
-      previousSeries && serializeValue(previousSeries) === serializeValue(nextSeries)
-        ? previousSeries
-        : nextSeries
+    if (!previousSeries) {
+      mergedHistory[portNumber] = nextSeries
+      continue
+    }
+
+    if (previousSeries.port !== nextSeries.port) {
+      mergedHistory[portNumber] = nextSeries
+      continue
+    }
+
+    if (previousSeries.samples.length !== nextSeries.samples.length) {
+      const previousSamplesByTimestamp = new Map(
+        previousSeries.samples.map((sample) => [sample.timestamp, sample]),
+      )
+      mergedHistory[portNumber] = {
+        ...nextSeries,
+        samples: nextSeries.samples.map((sample) => {
+          const previousSample = previousSamplesByTimestamp.get(sample.timestamp)
+          return previousSample && serializeValue(previousSample) === serializeValue(sample)
+            ? previousSample
+            : sample
+        }),
+      }
+      continue
+    }
+
+    let hasChanged = false
+    const mergedSamples = nextSeries.samples.map((sample, sampleIndex) => {
+      const previousSample = previousSeries.samples[sampleIndex]
+
+      if (
+        previousSample &&
+        previousSample.timestamp === sample.timestamp &&
+        serializeValue(previousSample) === serializeValue(sample)
+      ) {
+        return previousSample
+      }
+
+      hasChanged = true
+      return sample
+    })
+
+    mergedHistory[portNumber] = hasChanged
+      ? {
+          ...nextSeries,
+          samples: mergedSamples,
+        }
+      : previousSeries
   }
 
   return mergedHistory
@@ -292,7 +411,7 @@ function formatPollingTimestamp(timestamp: string | null) {
     return timestamp
   }
 
-  return parsedDate.toLocaleTimeString()
+  return formatLocalTimeDisplay(parsedDate)
 }
 
 function formatDurationMs(durationMs: number | null) {
@@ -446,6 +565,32 @@ function buildConnectionMeta(snapshot: AllPortsPdiResponse | null): string {
   }
 }
 
+function hydrateSnapshotWithConnectionStatus(
+  snapshot: AllPortsPdiResponse,
+  connectionStatus: ConnectionStatusResponse | null,
+): AllPortsPdiResponse {
+  if (!connectionStatus?.configured || !connectionStatus.connection) {
+    return snapshot
+  }
+
+  if (snapshot.connection && snapshot.polling.configured) {
+    return snapshot
+  }
+
+  return {
+    ...snapshot,
+    backend_mode: connectionStatus.connection.mode,
+    connection: connectionStatus.connection,
+    polling: connectionStatus.polling
+      ? connectionStatus.polling
+      : {
+          ...snapshot.polling,
+          backend_mode: connectionStatus.connection.mode,
+          configured: true,
+        },
+  }
+}
+
 function normalizePortDisplayOverride(override: PortDisplayOverride): PortDisplayOverride | null {
   const normalized: PortDisplayOverride = {}
 
@@ -455,6 +600,10 @@ function normalizePortDisplayOverride(override: PortDisplayOverride): PortDispla
 
   if (override.profileId && override.profileId !== 'generic') {
     normalized.profileId = override.profileId
+  }
+
+  if ('engineeringUnit' in override) {
+    normalized.engineeringUnit = override.engineeringUnit ?? null
   }
 
   if (override.preferredDecodeType) {
@@ -469,6 +618,46 @@ function normalizePortDisplayOverride(override: PortDisplayOverride): PortDispla
     normalized.byteOrder = override.byteOrder
   }
 
+  if (override.resolutionFactor && override.resolutionFactor !== 1) {
+    normalized.resolutionFactor = override.resolutionFactor
+  }
+
+  if (override.sourceWordCount !== undefined) {
+    normalized.sourceWordCount = override.sourceWordCount
+  }
+
+  if (override.fieldMode !== undefined) {
+    normalized.fieldMode = override.fieldMode
+  }
+
+  if (override.bitOffset !== undefined) {
+    normalized.bitOffset = override.bitOffset
+  }
+
+  if (override.bitLength !== undefined) {
+    normalized.bitLength = override.bitLength
+  }
+
+  if (override.signed !== undefined) {
+    normalized.signed = override.signed
+  }
+
+  if (override.processDataMode !== undefined) {
+    normalized.processDataMode = override.processDataMode
+  }
+
+  if ('processDataProfileId' in override) {
+    normalized.processDataProfileId = override.processDataProfileId ?? null
+  }
+
+  if ('sentinelMappings' in override) {
+    normalized.sentinelMappings = override.sentinelMappings ?? []
+  }
+
+  if ('statusBits' in override) {
+    normalized.statusBits = override.statusBits ?? []
+  }
+
   return Object.keys(normalized).length > 0 ? normalized : null
 }
 
@@ -476,9 +665,14 @@ function isSamePreview(previousPreview: DecodedPreview, nextPreview: DecodedPrev
   return (
     previousPreview.displayValue === nextPreview.displayValue &&
     previousPreview.rawValue === nextPreview.rawValue &&
+    previousPreview.scaledValue === nextPreview.scaledValue &&
+    previousPreview.mappingComparisonValue === nextPreview.mappingComparisonValue &&
+    previousPreview.rawDisplayValue === nextPreview.rawDisplayValue &&
     previousPreview.error === nextPreview.error &&
+    previousPreview.sentinelLabel === nextPreview.sentinelLabel &&
     serializeValue(previousPreview.sourceRegisters) ===
-      serializeValue(nextPreview.sourceRegisters)
+      serializeValue(nextPreview.sourceRegisters) &&
+    serializeValue(previousPreview.statusBits) === serializeValue(nextPreview.statusBits)
   )
 }
 
@@ -497,6 +691,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
   )
   const [featuredDecodesByPort, setFeaturedDecodesByPort] =
     useState<Record<number, DecodedPreview>>(createInitialDecodedPreviewMap)
+  const [ioddProfiles, setIoddProfiles] = useState<IoddDeviceProfile[]>([])
   const [selectedPortDecodes, setSelectedPortDecodes] =
     useState<PortDecodeCollection | null>(null)
   const [historyWindowMs, setHistoryWindowMs] = useState(DEFAULT_HISTORY_WINDOW_MS)
@@ -515,10 +710,15 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
   const historyWindowRef = useRef(historyWindowMs)
   const seedDraftRef = useRef(false)
   const isPollingRef = useRef(false)
+  const queuedRefreshRef = useRef<RefreshDashboardOptions | null>(null)
+  const refreshDashboardRef = useRef<
+    (options?: RefreshDashboardOptions) => Promise<void>
+  >(async () => {})
   const decodePreviewCacheRef = useRef<Map<string, DecodedPreview>>(new Map())
   const pendingDecodePreviewRef = useRef<Map<string, Promise<DecodedPreview>>>(new Map())
   const featuredDecodeRequestVersionRef = useRef(0)
   const selectedDecodeRequestVersionRef = useRef(0)
+  const lastHistoryFetchAtRef = useRef(0)
 
   useEffect(() => {
     savePortDisplayOverrides(portDisplayOverrides)
@@ -532,13 +732,70 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     connectionActionRef.current = isConnecting || isDisconnecting
   }, [isConnecting, isDisconnecting])
 
+  const refreshIoddLibrary = useCallback(async () => {
+    try {
+      const response = await fetchIoddLibrary()
+      const profiles = response.profiles ?? []
+      setRuntimeProcessDataProfiles(
+        profiles
+          .map((profile) => profile.processDataProfile)
+          .filter(
+            (profile): profile is Exclude<typeof profile, null> => profile !== null,
+          ),
+      )
+      setIoddProfiles((previousProfiles) =>
+        preserveReferenceIfEqual(previousProfiles, profiles),
+      )
+    } catch (error) {
+      setBanner((previousBanner) =>
+        previousBanner.tone === 'error'
+          ? previousBanner
+          : {
+              tone: 'warning',
+              title: 'IODD library unavailable',
+              body: getErrorMessage(error),
+            },
+      )
+    }
+  }, [])
+
+  const readConnectionStatusSafely = useCallback(async () => {
+    try {
+      return await fetchConnectionStatus()
+    } catch {
+      return null
+    }
+  }, [])
+
   const resolveConvertedPreview = useCallback(
     async (
       registers: number[],
-      displayConfig: Pick<PortDisplayConfig, 'preferredDecodeType' | 'wordOrder' | 'byteOrder'>,
+      displayConfig: PortDisplayConfig,
       dataType = displayConfig.preferredDecodeType,
     ): Promise<DecodedPreview> => {
       try {
+        const cacheKey = buildDecodePreviewCacheKey(registers, displayConfig, dataType)
+        const cachedPreview = decodePreviewCacheRef.current.get(cacheKey)
+        if (cachedPreview) {
+          return cachedPreview
+        }
+
+        const localPreview = decodeRegistersPreview(registers, displayConfig, dataType)
+        if (!localPreview.error) {
+          decodePreviewCacheRef.current.set(cacheKey, localPreview)
+          return localPreview
+        }
+
+        if (displayConfig.fieldMode === 'bit_field') {
+          decodePreviewCacheRef.current.set(cacheKey, localPreview)
+          return localPreview
+        }
+
+        const pendingPreview = pendingDecodePreviewRef.current.get(cacheKey)
+        if (pendingPreview) {
+          return pendingPreview
+        }
+
         const prepared = prepareRegistersForDecodeRequest(
           registers,
           {
@@ -549,16 +806,6 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
           dataType,
         )
 
-        const cachedPreview = decodePreviewCacheRef.current.get(prepared.cacheKey)
-        if (cachedPreview) {
-          return cachedPreview
-        }
-
-        const pendingPreview = pendingDecodePreviewRef.current.get(prepared.cacheKey)
-        if (pendingPreview) {
-          return pendingPreview
-        }
-
         const decodePromise = convertRegisters(prepared.request)
           .then((response) =>
             buildPreviewFromConvertedValue(
@@ -567,23 +814,19 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
               response.value,
             ),
           )
-          .catch((error) =>
-            buildUnavailablePreview(
-              error instanceof Error ? error.message : 'Decode unavailable',
-            ),
-          )
+          .catch(() => localPreview)
           .then((preview) => {
-            pendingDecodePreviewRef.current.delete(prepared.cacheKey)
+            pendingDecodePreviewRef.current.delete(cacheKey)
 
             if (decodePreviewCacheRef.current.size > 512) {
               decodePreviewCacheRef.current.clear()
             }
 
-            decodePreviewCacheRef.current.set(prepared.cacheKey, preview)
+            decodePreviewCacheRef.current.set(cacheKey, preview)
             return preview
           })
 
-        pendingDecodePreviewRef.current.set(prepared.cacheKey, decodePromise)
+        pendingDecodePreviewRef.current.set(cacheKey, decodePromise)
         return decodePromise
       } catch (error) {
         return buildUnavailablePreview(
@@ -599,27 +842,72 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       initial = false,
       allowAutoConnect = false,
       force = false,
-    }: {
-      initial?: boolean
-      allowAutoConnect?: boolean
-      force?: boolean
-    } = {}) => {
-      if (
-        isPollingRef.current ||
-        (!force && (document.hidden || connectionActionRef.current))
-      ) {
+      includeHistory = false,
+    }: RefreshDashboardOptions = {}) => {
+      if (isPollingRef.current) {
+        if (initial || allowAutoConnect || force || includeHistory) {
+          const queuedRefresh = queuedRefreshRef.current
+          queuedRefreshRef.current = {
+            initial: Boolean(initial || queuedRefresh?.initial),
+            allowAutoConnect: Boolean(
+              allowAutoConnect || queuedRefresh?.allowAutoConnect,
+            ),
+            force: Boolean(force || queuedRefresh?.force),
+            includeHistory: Boolean(includeHistory || queuedRefresh?.includeHistory),
+          }
+        }
+        return
+      }
+
+      if (!force && (document.hidden || connectionActionRef.current)) {
         return
       }
 
       isPollingRef.current = true
-      setIsRefreshing(true)
+      const showRefreshIndicator = initial || force
+      if (showRefreshIndicator) {
+        setIsRefreshing(true)
+      }
 
       try {
-        let [bulkSnapshot, bulkHistory] = await Promise.all([
-          fetchAllPortsPdi(),
-          fetchAllPortsHistory(historyWindowRef.current, HISTORY_CHART_MAX_POINTS),
-        ])
+        const shouldRefreshHistory =
+          includeHistory ||
+          lastHistoryFetchAtRef.current === 0 ||
+          Date.now() - lastHistoryFetchAtRef.current >= HISTORY_REFRESH_INTERVAL_MS
+        const loadSnapshotBundle = async (withHistory: boolean) => {
+          if (!withHistory) {
+            return {
+              bulkSnapshot: await fetchAllPortsPdi(),
+              bulkHistory: null as AllPortsHistoryResponse | null,
+            }
+          }
+
+          const [bulkSnapshot, bulkHistory] = await Promise.all([
+            fetchAllPortsPdi(),
+            fetchAllPortsHistory(historyWindowRef.current, HISTORY_CHART_MAX_POINTS),
+          ])
+
+          return {
+            bulkSnapshot,
+            bulkHistory,
+          }
+        }
+
+        let { bulkSnapshot, bulkHistory } = await loadSnapshotBundle(shouldRefreshHistory)
         let autoConnected = false
+        let connectionStatus: ConnectionStatusResponse | null = null
+
+        if (bulkHistory) {
+          lastHistoryFetchAtRef.current = Date.now()
+        }
+
+        if (force || initial || !bulkSnapshot.polling.configured || !bulkSnapshot.connection) {
+          connectionStatus = await readConnectionStatusSafely()
+          bulkSnapshot = hydrateSnapshotWithConnectionStatus(
+            bulkSnapshot,
+            connectionStatus,
+          )
+        }
 
         if (allowAutoConnect && !bulkSnapshot.polling.configured) {
           const connectResponse = await connectTarget(DEFAULT_REAL_CONNECT_REQUEST)
@@ -627,29 +915,41 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
           autoConnected = true
           seedDraftRef.current = true
           setConnectionDraft(buildConnectionDraft(connectResponse.connection))
-          ;[bulkSnapshot, bulkHistory] = await Promise.all([
-            fetchAllPortsPdi(),
-            fetchAllPortsHistory(historyWindowRef.current, HISTORY_CHART_MAX_POINTS),
-          ])
+          const refreshedBundle = await loadSnapshotBundle(true)
+          bulkSnapshot = refreshedBundle.bulkSnapshot
+          bulkHistory = refreshedBundle.bulkHistory
+          connectionStatus = await readConnectionStatusSafely()
+          bulkSnapshot = hydrateSnapshotWithConnectionStatus(
+            bulkSnapshot,
+            connectionStatus,
+          )
+          lastHistoryFetchAtRef.current = Date.now()
         }
 
         const nextPorts = mapBulkSnapshotToPorts(bulkSnapshot)
-        const nextHistory = mapBulkHistoryToPorts(bulkHistory)
+        const nextHistory = bulkHistory ? mapBulkHistoryToPorts(bulkHistory) : null
 
         startTransition(() => {
           setDashboard((previousValue) =>
             preserveReferenceIfEqual(previousValue, bulkSnapshot),
           )
-          setHistorySnapshot((previousValue) =>
-            preserveReferenceIfEqual(previousValue, bulkHistory),
-          )
           setPorts((previousValue) =>
             mergePortSnapshots(previousValue, nextPorts),
           )
-          setHistoryByPort((previousValue) =>
-            mergePortHistory(previousValue, nextHistory),
+          if (bulkHistory && nextHistory) {
+            setHistorySnapshot((previousValue) =>
+              preserveReferenceIfEqual(previousValue, bulkHistory),
+            )
+            setHistoryByPort((previousValue) =>
+              mergePortHistory(previousValue, nextHistory),
+            )
+          }
+          setBanner((previousBanner) =>
+            preserveBannerIfEqual(
+              previousBanner,
+              buildBannerFromSnapshot(bulkSnapshot),
+            ),
           )
-          setBanner(buildBannerFromSnapshot(bulkSnapshot))
           setHasLoadedOnce(true)
         })
 
@@ -659,30 +959,54 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
         }
 
         if (initial && autoConnected) {
-          setBanner({
-            tone: 'success',
-            title: 'Real device session ready',
-            body: 'The frontend connected to the configured ICE2 target and is now reading from the backend polling cache.',
-          })
+          setBanner((previousBanner) =>
+            preserveBannerIfEqual(previousBanner, {
+              tone: 'success',
+              title: 'Real device session ready',
+              body: 'The frontend connected to the configured ICE2 target and is now reading from the backend polling cache.',
+            }),
+          )
         }
       } catch (loadError) {
-        setBanner({
-          tone: 'error',
-          title: 'Dashboard refresh failed',
-          body: getErrorMessage(loadError),
-        })
+        setBanner((previousBanner) =>
+          preserveBannerIfEqual(previousBanner, {
+            tone: 'error',
+            title: 'Dashboard refresh failed',
+            body: getErrorMessage(loadError),
+          }),
+        )
       } finally {
-        setIsRefreshing(false)
+        if (showRefreshIndicator) {
+          setIsRefreshing(false)
+        }
         isPollingRef.current = false
+
+        const queuedRefresh = queuedRefreshRef.current
+        if (queuedRefresh) {
+          queuedRefreshRef.current = null
+          window.setTimeout(() => {
+            void refreshDashboardRef.current(queuedRefresh)
+          }, 0)
+        }
       }
     },
-    [],
+    [readConnectionStatusSafely],
   )
+
+  useEffect(() => {
+    refreshDashboardRef.current = refreshDashboard
+  }, [refreshDashboard])
 
   useEffect(() => {
     let cancelled = false
 
-    void refreshDashboard({ initial: true, allowAutoConnect: true, force: true })
+    void refreshDashboard({
+      initial: true,
+      allowAutoConnect: true,
+      force: true,
+      includeHistory: true,
+    })
+    void refreshIoddLibrary()
 
     const intervalId = window.setInterval(() => {
       if (!cancelled) {
@@ -694,14 +1018,14 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       cancelled = true
       window.clearInterval(intervalId)
     }
-  }, [refreshDashboard])
+  }, [refreshDashboard, refreshIoddLibrary])
 
   useEffect(() => {
     if (!hasLoadedOnce) {
       return
     }
 
-    void refreshDashboard({ force: true })
+    void refreshDashboard({ force: true, includeHistory: true })
   }, [hasLoadedOnce, historyWindowMs, refreshDashboard])
 
   const resolvedPortDisplayConfigs = useMemo(() => {
@@ -713,6 +1037,64 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       return accumulator
     }, {})
   }, [portDisplayOverrides])
+
+  const trendSeriesByPort = useMemo(() => {
+    return PORT_NUMBERS.reduce<Record<number, PortTrendSeries>>((accumulator, portNumber) => {
+      accumulator[portNumber] = buildPortTrendSeries(
+        historyByPort[portNumber]?.samples ?? [],
+        resolvedPortDisplayConfigs[portNumber],
+      )
+      return accumulator
+    }, {})
+  }, [historyByPort, resolvedPortDisplayConfigs])
+
+  const ioddProfilesById = useMemo(() => {
+    return ioddProfiles.reduce<Record<string, IoddDeviceProfile>>((accumulator, profile) => {
+      accumulator[profile.profileId] = profile
+      return accumulator
+    }, {})
+  }, [ioddProfiles])
+
+  const processDataByPort = useMemo(() => {
+    return PORT_NUMBERS.reduce<Record<number, ParsedProcessDataProfile | null>>(
+      (accumulator, portNumber) => {
+        const snapshot =
+          ports.find((portSnapshot) => portSnapshot.portNumber === portNumber) ??
+          createEmptySnapshot(portNumber)
+        const displayConfig = resolvedPortDisplayConfigs[portNumber]
+        const assignedIoddProfile =
+          displayConfig.processDataProfileId !== null
+            ? ioddProfilesById[displayConfig.processDataProfileId] ?? null
+            : null
+
+        if (!snapshot.pdi) {
+          accumulator[portNumber] = null
+          return accumulator
+        }
+
+        const resolvedProfile = resolveProcessDataProfile({
+          mode: displayConfig.processDataMode,
+          requestedProfileId: displayConfig.processDataProfileId,
+          deviceKey: assignedIoddProfile?.productId ?? assignedIoddProfile?.deviceName ?? null,
+          vendorId: assignedIoddProfile?.vendorId ?? null,
+          deviceId: assignedIoddProfile?.deviceId ?? null,
+        })
+
+        accumulator[portNumber] = resolvedProfile.profile
+          ? parseProcessDataPayload({
+              registers: snapshot.pdi.payload.registers,
+              profile: resolvedProfile.profile,
+              wordOrder: displayConfig.wordOrder,
+              byteOrder: displayConfig.byteOrder,
+              resolutionSource: resolvedProfile.source,
+            })
+          : null
+
+        return accumulator
+      },
+      {},
+    )
+  }, [ioddProfilesById, ports, resolvedPortDisplayConfigs])
 
   const selectedPortSnapshot = useMemo(
     () =>
@@ -726,8 +1108,26 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     [historyByPort, selectedPortNumber],
   )
 
+  const selectedPortTrendSeries = useMemo(
+    () => trendSeriesByPort[selectedPortNumber] ?? createEmptyTrendSeries(),
+    [selectedPortNumber, trendSeriesByPort],
+  )
+
   const selectedPortOverride = portDisplayOverrides[selectedPortNumber] ?? null
   const selectedPortDisplayConfig = resolvedPortDisplayConfigs[selectedPortNumber]
+
+  const selectedPortIoddProfile = useMemo(
+    () => {
+      const selectedProfileId = selectedPortDisplayConfig.processDataProfileId
+      return selectedProfileId ? ioddProfilesById[selectedProfileId] ?? null : null
+    },
+    [ioddProfilesById, selectedPortDisplayConfig.processDataProfileId],
+  )
+
+  const selectedPortProcessData = useMemo(
+    () => processDataByPort[selectedPortNumber] ?? null,
+    [processDataByPort, selectedPortNumber],
+  )
 
   useEffect(() => {
     const requestVersion = ++featuredDecodeRequestVersionRef.current
@@ -748,7 +1148,15 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
             resolvedPortDisplayConfigs[snapshot.portNumber],
           )
 
-          return [snapshot.portNumber, preview] as const
+          return [
+            snapshot.portNumber,
+            applyResolutionToPreview(
+              preview,
+              resolvedPortDisplayConfigs[snapshot.portNumber].preferredDecodeType,
+              resolvedPortDisplayConfigs[snapshot.portNumber].resolutionFactor,
+              resolvedPortDisplayConfigs[snapshot.portNumber].sentinelMappings,
+            ),
+          ] as const
         }),
       )
 
@@ -756,22 +1164,24 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
         return
       }
 
-      setFeaturedDecodesByPort((previousPreviews) => {
-        let hasChanged = false
-        const nextPreviews: Record<number, DecodedPreview> = { ...previousPreviews }
+      startTransition(() => {
+        setFeaturedDecodesByPort((previousPreviews) => {
+          let hasChanged = false
+          const nextPreviews: Record<number, DecodedPreview> = { ...previousPreviews }
 
-        for (const [portNumber, nextPreview] of previewEntries) {
-          const previousPreview = previousPreviews[portNumber]
-          if (previousPreview && isSamePreview(previousPreview, nextPreview)) {
-            nextPreviews[portNumber] = previousPreview
-            continue
+          for (const [portNumber, nextPreview] of previewEntries) {
+            const previousPreview = previousPreviews[portNumber]
+            if (previousPreview && isSamePreview(previousPreview, nextPreview)) {
+              nextPreviews[portNumber] = previousPreview
+              continue
+            }
+
+            nextPreviews[portNumber] = nextPreview
+            hasChanged = true
           }
 
-          nextPreviews[portNumber] = nextPreview
-          hasChanged = true
-        }
-
-        return hasChanged ? nextPreviews : previousPreviews
+          return hasChanged ? nextPreviews : previousPreviews
+        })
       })
     }
 
@@ -790,7 +1200,9 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       const selectedPdi = selectedPortSnapshot.pdi
 
       if (!selectedPdi) {
-        setSelectedPortDecodes(null)
+        startTransition(() => {
+          setSelectedPortDecodes(null)
+        })
         return
       }
 
@@ -807,7 +1219,15 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
             dataType,
           )
 
-          return [dataType, preview] as const
+          return [
+            dataType,
+            applyResolutionToPreview(
+              preview,
+              dataType,
+              selectedPortDisplayConfig.resolutionFactor,
+              selectedPortDisplayConfig.sentinelMappings,
+            ),
+          ] as const
         }),
       )
 
@@ -816,7 +1236,9 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       }
 
       const previews = Object.fromEntries(previewEntries)
-      setSelectedPortDecodes(buildPortDecodeCollection(featuredType, previews))
+      startTransition(() => {
+        setSelectedPortDecodes(buildPortDecodeCollection(featuredType, previews))
+      })
     }
 
     void syncSelectedPortDecodes()
@@ -847,6 +1269,35 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       },
     )
   }, [ports])
+
+  const diagnosticsByPort = useMemo(() => {
+    return PORT_NUMBERS.reduce<Record<number, PortDiagnostic>>((accumulator, portNumber) => {
+      const snapshot =
+        ports.find((portSnapshot) => portSnapshot.portNumber === portNumber) ??
+        createEmptySnapshot(portNumber)
+      const featuredPreview =
+        featuredDecodesByPort[portNumber] ?? buildUnavailablePreview('Awaiting decode')
+
+      accumulator[portNumber] = buildPortDiagnostic(
+        snapshot,
+        resolvedPortDisplayConfigs[portNumber],
+        featuredPreview,
+        trendSeriesByPort[portNumber] ?? createEmptyTrendSeries(),
+        dashboard,
+      )
+      return accumulator
+    }, {})
+  }, [dashboard, featuredDecodesByPort, ports, resolvedPortDisplayConfigs, trendSeriesByPort])
+
+  const selectedPortDiagnostic = useMemo(
+    () => diagnosticsByPort[selectedPortNumber],
+    [diagnosticsByPort, selectedPortNumber],
+  )
+
+  const diagnosticCounts = useMemo(
+    () => countDiagnosticLevels(diagnosticsByPort),
+    [diagnosticsByPort],
+  )
 
   const connectionSummary = useMemo(() => {
     if (!dashboard?.connection) {
@@ -914,7 +1365,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
 
       seedDraftRef.current = true
       setConnectionDraft(buildConnectionDraft(response.connection))
-      await refreshDashboard({ force: true })
+      await refreshDashboard({ force: true, includeHistory: true })
 
       setBanner({
         tone: 'success',
@@ -943,7 +1394,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
         setConnectionDraft(buildConnectionDraft(response.connection))
       }
 
-      await refreshDashboard({ force: true })
+      await refreshDashboard({ force: true, includeHistory: true })
       setBanner({
         tone: 'info',
         title: 'Backend target disconnected',
@@ -1001,43 +1452,106 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     })
   }, [])
 
-  return {
-    dashboard,
-    historySnapshot,
-    ports,
-    historyByPort,
-    featuredDecodesByPort,
-    selectedPortDecodes,
-    historyWindowMs,
-    portDisplayOverrides,
-    resolvedPortDisplayConfigs,
-    selectedPortNumber,
-    selectedPortSnapshot,
-    selectedPortHistory,
-    selectedPortOverride,
-    selectedPortDisplayConfig,
-    connectionDraft,
-    hasLoadedOnce,
-    isRefreshing,
-    isConnecting,
-    isDisconnecting,
-    banner,
-    communicationPresentation,
-    severityCounts,
-    connectionSummary,
-    connectionMeta,
-    backendModeLabel,
-    lastUpdatedLabel,
-    staleStateLabel,
-    staleStateTone,
-    uiRefreshMs: UI_REFRESH_INTERVAL_MS,
-    setHistoryWindowMs,
-    setSelectedPortNumber,
-    setConnectionDraft,
-    refreshDashboard,
-    handleConnect,
-    handleDisconnect,
-    updatePortDisplayOverride,
-    resetPortDisplay,
-  }
+  return useMemo(
+    () => ({
+      dashboard,
+      historySnapshot,
+      ports,
+      historyByPort,
+      trendSeriesByPort,
+      featuredDecodesByPort,
+      ioddProfiles,
+      ioddProfilesById,
+      processDataByPort,
+      diagnosticsByPort,
+      selectedPortDecodes,
+      historyWindowMs,
+      portDisplayOverrides,
+      resolvedPortDisplayConfigs,
+      selectedPortNumber,
+      selectedPortSnapshot,
+      selectedPortHistory,
+      selectedPortTrendSeries,
+      selectedPortIoddProfile,
+      selectedPortProcessData,
+      selectedPortOverride,
+      selectedPortDisplayConfig,
+      selectedPortDiagnostic,
+      connectionDraft,
+      hasLoadedOnce,
+      isRefreshing,
+      isConnecting,
+      isDisconnecting,
+      banner,
+      communicationPresentation,
+      severityCounts,
+      diagnosticCounts,
+      connectionSummary,
+      connectionMeta,
+      backendModeLabel,
+      lastUpdatedLabel,
+      staleStateLabel,
+      staleStateTone,
+      uiRefreshMs: UI_REFRESH_INTERVAL_MS,
+      historyRefreshMs: HISTORY_REFRESH_INTERVAL_MS,
+      setHistoryWindowMs,
+      setSelectedPortNumber,
+      setConnectionDraft,
+      refreshDashboard,
+      refreshIoddLibrary,
+      handleConnect,
+      handleDisconnect,
+      updatePortDisplayOverride,
+      resetPortDisplay,
+    }),
+    [
+      backendModeLabel,
+      banner,
+      communicationPresentation,
+      connectionDraft,
+      connectionMeta,
+      connectionSummary,
+      dashboard,
+      diagnosticCounts,
+      diagnosticsByPort,
+      featuredDecodesByPort,
+      handleConnect,
+      handleDisconnect,
+      hasLoadedOnce,
+      historyByPort,
+      historySnapshot,
+      historyWindowMs,
+      ioddProfiles,
+      ioddProfilesById,
+      isConnecting,
+      isDisconnecting,
+      isRefreshing,
+      lastUpdatedLabel,
+      portDisplayOverrides,
+      ports,
+      processDataByPort,
+      refreshDashboard,
+      refreshIoddLibrary,
+      resetPortDisplay,
+      resolvedPortDisplayConfigs,
+      selectedPortDecodes,
+      selectedPortDiagnostic,
+      selectedPortDisplayConfig,
+      selectedPortHistory,
+      selectedPortIoddProfile,
+      selectedPortNumber,
+      selectedPortOverride,
+      selectedPortProcessData,
+      selectedPortSnapshot,
+      selectedPortTrendSeries,
+      setConnectionDraft,
+      setHistoryWindowMs,
+      setSelectedPortNumber,
+      severityCounts,
+      staleStateLabel,
+      staleStateTone,
+      trendSeriesByPort,
+      updatePortDisplayOverride,
+    ],
+  )
 }

@@ -5,11 +5,22 @@ export type DecodeType =
   | 'int32'
   | 'float32'
   | 'binary'
+export type HistoryExportRange =
+  | '30s'
+  | '2min'
+  | '10min'
+  | '15min'
+  | '30min'
+  | '1h'
+export type HistoryExportMode = 'preset' | 'custom'
 
 export type BackendMode = 'real' | 'simulator'
 export type WordOrder = 'big' | 'little'
 export type ByteOrder = 'big' | 'little'
+export type ResolutionFactor = 1 | 0.1 | 0.01 | 0.001
+export type FieldMode = 'full_word' | 'bit_field'
 export type PortSeverity = 'normal' | 'warning' | 'critical'
+export type DiagnosticLevel = PortSeverity
 export type PortProfileId =
   | 'generic'
   | 'temperature'
@@ -21,6 +32,7 @@ export type CommunicationState =
   | 'stale'
   | 'disconnected'
   | 'polling_error'
+export type DeviceProfileSource = 'builtin' | 'iodd'
 
 export interface ConnectionInfo {
   mode: BackendMode
@@ -40,17 +52,26 @@ export interface HealthResponse {
   stale_after_ms?: number
   reconnect_base_ms?: number
   reconnect_max_ms?: number
+  history_sample_interval_ms?: number
   cache_running?: boolean
   cache_updated_at?: string | null
   last_successful_poll_at?: string | null
   cache_is_stale?: boolean
   communication_state?: CommunicationState
   last_error?: string | null
+  iodd_upload_enabled?: boolean
+  dependencies?: {
+    fastapi?: string
+    uvicorn?: string
+    pymodbus?: string
+    python_multipart?: string
+  }
 }
 
 export interface PollingStatus {
   backend_mode: BackendMode
   interval_ms: number
+  history_sample_interval_ms: number
   stale_after_ms: number
   payload_word_count: number
   block_mode: 'multiple' | 'specific'
@@ -97,6 +118,82 @@ export interface DisconnectResponse {
   message: string
   connection: ConnectionInfo | null
 }
+
+export type IsduOperation = 'read' | 'write'
+export type IsduPreviewSource = 'response' | 'request' | 'none'
+
+export interface IsduReadRequest {
+  port: number
+  index: number
+  subindex: number
+}
+
+export interface IsduWriteRequest {
+  port: number
+  index: number
+  subindex: number
+  data_hex: string
+}
+
+export interface IsduTransportInfo {
+  mode: BackendMode
+  protocol: 'rest-http' | 'simulator'
+  endpoint_url: string
+  timeout_seconds: number
+  uses_basic_auth: boolean
+}
+
+export interface IsduRequestFrame {
+  operation: IsduOperation
+  port: number
+  device_port: number
+  index: number
+  subindex: number
+  data_hex: string | null
+  payload: Array<Record<string, number | string>>
+  payload_json: string
+}
+
+export interface IsduResponseEnvelope {
+  ok: boolean
+  timed_out: boolean
+  acknowledged: boolean
+  status: string
+  code: number | null
+  data_hex: string | null
+  raw_json: unknown
+  raw_json_pretty: string
+}
+
+export interface IsduDecodedPreview {
+  byte_count: number
+  hex: string
+  bytes: number[]
+  uint16_be: number | null
+  uint16_le: number | null
+  int16_be: number | null
+  int16_le: number | null
+  uint32_be: number | null
+  uint32_le: number | null
+  int32_be: number | null
+  int32_le: number | null
+  utf8: string | null
+  ascii: string | null
+}
+
+export interface IsduOperationResponse {
+  connection: ConnectionInfo
+  transport: IsduTransportInfo
+  request: IsduRequestFrame
+  response: IsduResponseEnvelope
+  preview: IsduDecodedPreview | null
+  preview_source: IsduPreviewSource
+  error: string | null
+  duration_ms: number
+}
+
+export type IsduReadResponse = IsduOperationResponse
+export type IsduWriteResponse = IsduOperationResponse
 
 export interface PdiBlockMetadata {
   mode: 'multiple' | 'specific'
@@ -215,12 +312,169 @@ export interface DecodeSettings {
   byteOrder: ByteOrder
 }
 
+export interface SentinelMapping {
+  value: number
+  label: string
+}
+
+export interface StatusBitDefinition {
+  bit: number
+  label: string
+}
+
+export interface StatusBitState extends StatusBitDefinition {
+  active: boolean
+}
+
+export type ProcessDataProfileMode = 'manual' | 'profile' | 'auto'
+export type ProcessDataProfileId = string
+export type ProcessDataFieldType =
+  | 'bool'
+  | 'uint'
+  | 'int'
+  | 'enum'
+  | 'binary'
+  | 'float32'
+export type ProcessDataFieldRole =
+  | 'primary_value'
+  | 'scale'
+  | 'status'
+  | 'quality'
+  | 'diagnostic'
+  | 'meta'
+
+export interface ProcessDataDeviceHint {
+  deviceKey?: string | null
+  vendorId?: number | null
+  deviceId?: number | null
+}
+
+export interface ProcessDataEnumMapping {
+  value: number
+  label: string
+}
+
+export interface ProcessDataFieldDefinition {
+  name: string
+  label: string
+  bitOffset: number
+  bitLength: number
+  type: ProcessDataFieldType
+  role?: ProcessDataFieldRole
+  signed?: boolean
+  scaleFactor?: number
+  unit?: string | null
+  description?: string | null
+  enumMappings?: ProcessDataEnumMapping[]
+}
+
+export interface ProcessDataProfileSummary extends ProcessDataDeviceHint {
+  id: ProcessDataProfileId
+  name: string
+  description: string
+  totalBitLength: number
+  sourceWordCount: number
+}
+
+export interface ProcessDataProfileDefinition extends ProcessDataProfileSummary {
+  fields: ProcessDataFieldDefinition[]
+  primaryFieldName?: string | null
+}
+
+export type ProcessDataResolutionSource =
+  | 'manual_disabled'
+  | 'manual_selection'
+  | 'device_identity'
+  | 'device_key'
+  | 'unresolved'
+
+export interface ParsedProcessDataField {
+  name: string
+  label: string
+  type: ProcessDataFieldType
+  role: ProcessDataFieldRole | null
+  bitOffset: number
+  bitLength: number
+  bitRangeLabel: string
+  rawValue: number | string | boolean | null
+  rawDisplayValue: string
+  scaledValue: number | string | boolean | null
+  displayValue: string
+  unit: string | null
+  description: string | null
+  active: boolean | null
+  isMapped: boolean
+}
+
+export interface ParsedProcessDataProfile extends ProcessDataProfileSummary {
+  resolutionSource: ProcessDataResolutionSource
+  sourceRegisters: number[]
+  rawHex: string
+  primaryField: ParsedProcessDataField | null
+  fields: ParsedProcessDataField[]
+  statusFields: ParsedProcessDataField[]
+  qualityFields: ParsedProcessDataField[]
+  error: string | null
+}
+
+export interface IoddIsduVariable {
+  key: string
+  name: string
+  index: number
+  subindex: number
+  accessRights: string | null
+  dataType: string | null
+  bitLength: number | null
+  unit: string | null
+  description: string | null
+  enumMappings: ProcessDataEnumMapping[]
+}
+
+export interface IoddDeviceProfile {
+  profileId: string
+  source: Exclude<DeviceProfileSource, 'builtin'>
+  fileName: string
+  uploadedAtUtc: string
+  vendorId: number | null
+  vendorName: string | null
+  deviceId: number | null
+  deviceName: string
+  deviceFamily: string | null
+  productId: string | null
+  processDataInBitLength: number | null
+  processDataOutBitLength: number | null
+  processDataProfile: ProcessDataProfileDefinition | null
+  isduVariables: IoddIsduVariable[]
+}
+
+export interface IoddLibraryResponse {
+  count: number
+  profiles: IoddDeviceProfile[]
+}
+
+export interface IoddUploadResponse {
+  uploaded: boolean
+  profile: IoddDeviceProfile
+  count: number
+}
+
 export interface PortDisplayOverride {
   label?: string
   profileId?: PortProfileId
+  engineeringUnit?: string | null
   preferredDecodeType?: DecodeType
   wordOrder?: WordOrder
   byteOrder?: ByteOrder
+  resolutionFactor?: ResolutionFactor
+  sourceWordCount?: number
+  fieldMode?: FieldMode
+  bitOffset?: number
+  bitLength?: number
+  signed?: boolean
+  sentinelMappings?: SentinelMapping[]
+  statusBits?: StatusBitDefinition[]
+  processDataMode?: ProcessDataProfileMode
+  processDataProfileId?: ProcessDataProfileId | null
 }
 
 export type PortDisplayOverrides = Partial<Record<number, PortDisplayOverride>>
@@ -236,6 +490,16 @@ export interface PortDisplayConfig {
   preferredDecodeType: DecodeType
   wordOrder: WordOrder
   byteOrder: ByteOrder
+  resolutionFactor: ResolutionFactor
+  sourceWordCount: number
+  fieldMode: FieldMode
+  bitOffset: number
+  bitLength: number
+  signed: boolean
+  sentinelMappings: SentinelMapping[]
+  statusBits: StatusBitDefinition[]
+  processDataMode: ProcessDataProfileMode
+  processDataProfileId: ProcessDataProfileId | null
   usesProfileDefaults: boolean
   isCustomized: boolean
 }
@@ -252,12 +516,19 @@ export interface ConnectionDraft {
 export interface DecodedPreview {
   displayValue: string
   rawValue: number | string | null
+  scaledValue: number | string | null
+  mappingComparisonValue: number | null
+  rawDisplayValue: string | null
   sourceRegisters: number[]
   error: string | null
+  sentinelLabel: string | null
+  statusBits: StatusBitState[]
 }
 
 export interface PortDecodeCollection {
   featured: DecodedPreview
+  uint16: DecodedPreview
+  int16: DecodedPreview
   float32: DecodedPreview
   uint32: DecodedPreview
   int32: DecodedPreview
@@ -269,4 +540,84 @@ export interface PortSnapshot {
   severity: PortSeverity
   pdi: PdiResponse | null
   error: string | null
+}
+
+export type DiagnosticReasonCode =
+  | 'fault'
+  | 'invalid_pdi'
+  | 'stale_data'
+  | 'event_code'
+  | 'sentinel_value'
+  | 'value_out_of_range'
+  | 'drift'
+  | 'spike'
+  | 'flatline'
+  | 'polling_error'
+  | 'no_snapshot'
+
+export interface PortDiagnosticReason {
+  code: DiagnosticReasonCode
+  level: DiagnosticLevel
+  title: string
+  detail: string
+}
+
+export type DiagnosticForecastDirection =
+  | 'rising'
+  | 'falling'
+  | 'stable'
+  | 'unknown'
+
+export type DiagnosticSignalQualityLabel =
+  | 'stable'
+  | 'watch'
+  | 'volatile'
+  | 'degraded'
+
+export interface PortDiagnosticCause {
+  title: string
+  detail: string
+  weight: number
+}
+
+export interface PortDiagnosticEvidence {
+  label: string
+  detail: string
+}
+
+export interface PortDiagnosticForecast {
+  horizonLabel: string
+  direction: DiagnosticForecastDirection
+  summary: string
+  projectedValue: string | null
+  worseningProbability: number
+  expectedState: string
+  stability: DiagnosticSignalQualityLabel
+}
+
+export interface PortDiagnosticSignalQuality {
+  label: DiagnosticSignalQualityLabel
+  score: number
+  summary: string
+}
+
+export interface PortDiagnostic {
+  portNumber: number
+  level: DiagnosticLevel
+  anomalyScore: number
+  confidenceScore: number
+  currentRiskScore: number
+  projectedRiskScore: number
+  summary: string
+  currentInterpretation: string
+  suggestedAction: string
+  reasons: PortDiagnosticReason[]
+  probableCauses: PortDiagnosticCause[]
+  evidence: PortDiagnosticEvidence[]
+  forecast: PortDiagnosticForecast
+  signalQuality: PortDiagnosticSignalQuality
+  liveValue: string | null
+  liveNumericValue: number | null
+  trendStatus: 'ready' | 'fallback' | 'unavailable'
+  trendDelta: string | null
 }

@@ -1,13 +1,13 @@
 import { memo } from 'react'
 
 import type { PortDisplayConfig, PortSnapshot } from '../api/types'
-import StatusBadge from './StatusBadge'
 
 interface PortSelectorStripProps {
   ports: PortSnapshot[]
   displayConfigs: Record<number, PortDisplayConfig>
   selectedPortNumber: number
   onSelect: (portNumber: number) => void
+  variant?: 'default' | 'compact'
 }
 
 function PortSelectorStrip({
@@ -15,17 +15,22 @@ function PortSelectorStrip({
   displayConfigs,
   selectedPortNumber,
   onSelect,
+  variant = 'default',
 }: PortSelectorStripProps) {
   const sortedPorts = [...ports].sort((leftPort, rightPort) => leftPort.portNumber - rightPort.portNumber)
+  const isCompact = variant === 'compact'
 
   return (
-    <section className="selector-panel">
+    <section className={`selector-panel ${isCompact ? 'selector-panel--compact' : ''}`}>
       <div className="selector-panel__head">
         <div>
           <p className="section-kicker">Port index</p>
-          <h2 className="section-title">Overview focus</h2>
+          <h2 className="section-title">{isCompact ? 'Active port' : 'Overview focus'}</h2>
         </div>
-        <StatusBadge label={`Port ${selectedPortNumber}`} tone="normal" />
+        <div className="selector-port-chip" aria-label={`Selected port ${selectedPortNumber}`}>
+          <span className="selector-port-chip__label">Port</span>
+          <strong className="selector-port-chip__value">{selectedPortNumber}</strong>
+        </div>
       </div>
 
       <div className="selector-grid">
@@ -42,7 +47,9 @@ function PortSelectorStrip({
             >
               <div className="selector-card__copy">
                 <p className="selector-card__eyebrow">P{snapshot.portNumber}</p>
-                <strong className="selector-card__title">{config.label}</strong>
+                <strong className="selector-card__title">
+                  {isCompact ? `Port ${snapshot.portNumber}` : config.label}
+                </strong>
               </div>
             </button>
           )

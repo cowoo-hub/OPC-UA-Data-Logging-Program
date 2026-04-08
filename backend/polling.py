@@ -39,6 +39,7 @@ class PollingStatus:
 
     backend_mode: str
     interval_ms: int
+    history_sample_interval_ms: int
     stale_after_ms: int
     payload_word_count: int
     block_mode: PDIBlockMode
@@ -62,6 +63,7 @@ class PollingStatus:
         return {
             "backend_mode": self.backend_mode,
             "interval_ms": self.interval_ms,
+            "history_sample_interval_ms": self.history_sample_interval_ms,
             "stale_after_ms": self.stale_after_ms,
             "payload_word_count": self.payload_word_count,
             "block_mode": self.block_mode,
@@ -102,8 +104,9 @@ class PDICacheWorker:
         stale_after_ms: int = 250,
         reconnect_base_ms: int = 250,
         reconnect_max_ms: int = 5000,
-        history_retention_ms: int = 120000,
-        history_max_points: int = 120,
+        history_retention_ms: int = 600000,
+        history_max_points: int = 240,
+        history_sample_interval_ms: int = 100,
         payload_word_count: int = DEFAULT_PAYLOAD_WORD_COUNT,
         block_mode: PDIBlockMode = "multiple",
     ) -> None:
@@ -116,6 +119,7 @@ class PDICacheWorker:
         self._reconnect_max_ms = reconnect_max_ms
         self._history_retention_ms = history_retention_ms
         self._history_max_points = history_max_points
+        self._history_sample_interval_ms = history_sample_interval_ms
         self._payload_word_count = payload_word_count
         self._block_mode = block_mode
 
@@ -137,6 +141,7 @@ class PDICacheWorker:
         }
         self._updated_at_monotonic: float | None = None
         self._updated_at_iso: str | None = None
+        self._last_history_sample_monotonic: float | None = None
         self._cycle_count = 0
         self._last_error: str | None = None
         self._last_failure_at_iso: str | None = None
@@ -158,8 +163,9 @@ class PDICacheWorker:
                 self._stale_after_ms,
             )
             logger.info(
-                "History buffer configured with retention=%sms, default_max_points=%s, source_register_count=%s",
+                "History buffer configured with retention=%sms, sample_interval=%sms, default_max_points=%s, source_register_count=%s",
                 self._history_retention_ms,
+                self._history_sample_interval_ms,
                 self._history_max_points,
                 HISTORY_SOURCE_REGISTER_COUNT,
             )
@@ -190,6 +196,7 @@ class PDICacheWorker:
                 }
                 self._updated_at_monotonic = None
                 self._updated_at_iso = None
+                self._last_history_sample_monotonic = None
                 self._cycle_count = 0
 
             self._last_error = None
@@ -275,6 +282,7 @@ class PDICacheWorker:
         return PollingStatus(
             backend_mode=backend_mode,
             interval_ms=self._poll_interval_ms,
+            history_sample_interval_ms=self._history_sample_interval_ms,
             stale_after_ms=self._stale_after_ms,
             payload_word_count=self._payload_word_count,
             block_mode=self._block_mode,
@@ -393,23 +401,67 @@ class PDICacheWorker:
             ),
         }
 
+    def get_port_history_for_export(
+        self,
+        port: int,
+        *,
+        window_ms: int | None = None,
+    ) -> dict[str, object]:
+        """Return cached history for one port without downsampling for CSV export."""
+        with self._lock:
+            connection = self._connection
+            history_entries = list(self._history_by_port.get(port, deque()))
+
+        status = self.get_status()
+        resolved_window_ms = self._history_retention_ms if window_ms is None else max(
+            1000,
+            min(window_ms, self._history_retention_ms),
+        )
+
+        return {
+            "backend_mode": status.backend_mode,
+            "connection": None if connection is None else connection.to_dict(),
+            "polling": status.to_dict(),
+            "history_window_ms": resolved_window_ms,
+            "history_retention_ms": self._history_retention_ms,
+            "history_max_points": None,
+            "history_source_register_count": HISTORY_SOURCE_REGISTER_COUNT,
+            "port": port,
+            "samples": self._select_history_samples(
+                history_entries,
+                window_ms=resolved_window_ms,
+                max_points=None,
+            ),
+        }
+
     def _set_success_snapshot(
         self,
         connection: ModbusConnectionConfig,
         port_snapshots: dict[int, dict[str, object]],
     ) -> None:
+        first_success = False
+        recovered_from_error = False
+        cycle_count = 0
+        should_sample_history = False
+
         with self._lock:
             if self._connection != connection:
                 return
 
+            first_success = self._updated_at_monotonic is None
+            recovered_from_error = self._last_error is not None
             recorded_at_monotonic = time.monotonic()
             recorded_at_iso = datetime.now(timezone.utc).isoformat()
             self._ports_by_number = port_snapshots
+            should_sample_history = self._should_sample_history_locked(recorded_at_monotonic)
             self._append_history_samples_locked(
                 port_snapshots=port_snapshots,
                 recorded_at_monotonic=recorded_at_monotonic,
                 recorded_at_iso=recorded_at_iso,
+                append_samples=should_sample_history,
             )
+            if should_sample_history:
+                self._last_history_sample_monotonic = recorded_at_monotonic
             self._updated_at_monotonic = recorded_at_monotonic
             self._updated_at_iso = recorded_at_iso
             self._cycle_count += 1
@@ -419,6 +471,19 @@ class PDICacheWorker:
             self._reconnect_attempts = 0
             self._next_retry_monotonic = None
             self._next_retry_at_iso = None
+            cycle_count = self._cycle_count
+
+        if first_success or recovered_from_error:
+            logger.info(
+                "PDI cache update succeeded for mode=%s host=%s port=%s slave_id=%s cycle=%s sampled_history=%s ports=%s",
+                connection.mode,
+                connection.host,
+                connection.port,
+                connection.slave_id,
+                cycle_count,
+                should_sample_history,
+                len(port_snapshots),
+            )
 
     def _set_error(
         self,
@@ -568,6 +633,7 @@ class PDICacheWorker:
         port_snapshots: dict[int, dict[str, object]],
         recorded_at_monotonic: float,
         recorded_at_iso: str,
+        append_samples: bool,
     ) -> None:
         cutoff = recorded_at_monotonic - (self._history_retention_ms / 1000.0)
 
@@ -575,7 +641,7 @@ class PDICacheWorker:
             history_deque = self._history_by_port.setdefault(port, deque())
             snapshot = port_snapshots.get(port)
 
-            if snapshot is not None:
+            if append_samples and snapshot is not None:
                 sample = self._build_history_sample(
                     snapshot=snapshot,
                     recorded_at_iso=recorded_at_iso,
@@ -585,6 +651,13 @@ class PDICacheWorker:
 
             while history_deque and history_deque[0][0] < cutoff:
                 history_deque.popleft()
+
+    def _should_sample_history_locked(self, recorded_at_monotonic: float) -> bool:
+        if self._last_history_sample_monotonic is None:
+            return True
+
+        elapsed_ms = (recorded_at_monotonic - self._last_history_sample_monotonic) * 1000.0
+        return elapsed_ms >= self._history_sample_interval_ms
 
     def _build_history_sample(
         self,
@@ -633,7 +706,7 @@ class PDICacheWorker:
         history_entries: list[tuple[float, dict[str, object]]],
         *,
         window_ms: int,
-        max_points: int,
+        max_points: int | None,
     ) -> list[dict[str, object]]:
         if not history_entries:
             return []
@@ -647,6 +720,9 @@ class PDICacheWorker:
 
         if not filtered_entries:
             return []
+
+        if max_points is None:
+            return filtered_entries
 
         if len(filtered_entries) <= max_points:
             return filtered_entries

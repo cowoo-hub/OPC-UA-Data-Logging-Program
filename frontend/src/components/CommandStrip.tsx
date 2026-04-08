@@ -2,6 +2,7 @@ import type { ChangeEvent } from 'react'
 
 import type { ConnectionDraft } from '../api/types'
 import type { BannerState, StatusTone } from '../hooks/useMonitoringWorkspace'
+import StableSelect from './StableSelect'
 import StatusBadge from './StatusBadge'
 
 interface CommandStripProps {
@@ -14,23 +15,14 @@ interface CommandStripProps {
   staleStateLabel: string
   staleStateTone: StatusTone
   lastUpdatedLabel: string | null
-  historyWindowMs: number
   banner: BannerState
   isConnecting: boolean
   isDisconnecting: boolean
   onConnectionChange: (nextValue: ConnectionDraft) => void
-  onHistoryWindowChange: (nextValue: number) => void
   onConnect: () => void
   onDisconnect: () => void
   onRefresh: () => void
 }
-
-const historyWindowOptions = [
-  { value: 15000, label: '15s trend' },
-  { value: 30000, label: '30s trend' },
-  { value: 60000, label: '60s trend' },
-  { value: 120000, label: '120s trend' },
-] as const
 
 function CommandStrip({
   connectionDraft,
@@ -42,12 +34,10 @@ function CommandStrip({
   staleStateLabel,
   staleStateTone,
   lastUpdatedLabel,
-  historyWindowMs,
   banner,
   isConnecting,
   isDisconnecting,
   onConnectionChange,
-  onHistoryWindowChange,
   onConnect,
   onDisconnect,
   onRefresh,
@@ -58,6 +48,15 @@ function CommandStrip({
       onConnectionChange({
         ...connectionDraft,
         [field]: event.target.value,
+      })
+    }
+
+  const updateConnectionValue =
+    (field: keyof ConnectionDraft) =>
+    (value: string) => {
+      onConnectionChange({
+        ...connectionDraft,
+        [field]: value,
       })
     }
 
@@ -99,10 +98,14 @@ function CommandStrip({
         <div className="command-strip__fields command-strip__fields--connection">
           <label className="command-field command-field--mode">
             <span className="command-field__label">Mode</span>
-            <select value={connectionDraft.mode} onChange={updateConnectionField('mode')}>
-              <option value="real">Real ICE2</option>
-              <option value="simulator">Simulator</option>
-            </select>
+            <StableSelect
+              value={connectionDraft.mode}
+              onChange={updateConnectionValue('mode')}
+              options={[
+                { value: 'real', label: 'Real ICE2' },
+                { value: 'simulator', label: 'Simulator' },
+              ]}
+            />
           </label>
 
           <label className="command-field command-field--host">
@@ -179,44 +182,6 @@ function CommandStrip({
             >
               {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
             </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="command-strip__surface command-strip__surface--session">
-        <div className="command-strip__surface-head">
-          <div>
-            <p className="section-kicker">Live telemetry</p>
-            <h2 className="section-title">Session cadence</h2>
-          </div>
-          <StatusBadge label={`${Math.round(historyWindowMs / 1000)} s trend`} tone="neutral" />
-        </div>
-
-        <div className="command-strip__fields command-strip__fields--session">
-          <label className="command-field">
-            <span className="command-field__label">History</span>
-            <select
-              value={historyWindowMs}
-              onChange={(event) => onHistoryWindowChange(Number(event.target.value))}
-            >
-              {historyWindowOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="command-strip__telemetry-chip">
-            <span className="command-field__label">Decode model</span>
-            <strong>Per-port only</strong>
-            <span>Each port now owns its own data type, byte order, and word order.</span>
-          </div>
-
-          <div className="command-strip__telemetry-chip">
-            <span className="command-field__label">Overview sync</span>
-            <strong>Shared state</strong>
-            <span>Changes in Monitor and Port Overview stay synchronized through one workspace store.</span>
           </div>
         </div>
       </div>

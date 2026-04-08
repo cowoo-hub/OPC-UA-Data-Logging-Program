@@ -1,0 +1,469 @@
+{
+  "profileId": "iodd:vendor:omt550-r200-series",
+  "parserVersion": 2,
+  "source": "iodd",
+  "fileName": "Pepperl-Fuchs-OMT550-R200-20190330-IODD1.1.xml",
+  "uploadedAtUtc": "2026-04-07T09:44:46.218992+00:00",
+  "vendorId": null,
+  "vendorName": null,
+  "deviceId": null,
+  "deviceName": "OMT550 R200 series",
+  "deviceFamily": "Distance sensor",
+  "productId": null,
+  "processDataInBitLength": 32,
+  "processDataOutBitLength": null,
+  "processDataProfile": {
+    "id": "iodd:vendor:omt550-r200-series",
+    "name": "OMT550 R200 series",
+    "description": "IODD-derived profile for OMT550 R200 series",
+    "deviceKey": "OMT550 R200 series",
+    "vendorId": null,
+    "deviceId": null,
+    "totalBitLength": 32,
+    "sourceWordCount": 2,
+    "fields": [
+      {
+        "name": "ssc1-switching-signal-1",
+        "label": "SSC1 - Switching Signal 1",
+        "bitOffset": 0,
+        "bitLength": 1,
+        "type": "bool",
+        "role": "status",
+        "unit": null,
+        "description": null,
+        "enumMappings": [
+          {
+            "value": 1,
+            "label": "Active"
+          }
+        ]
+      },
+      {
+        "name": "ssc2-switching-signal-2",
+        "label": "SSC2 - Switching Signal 2",
+        "bitOffset": 1,
+        "bitLength": 1,
+        "type": "bool",
+        "role": "status",
+        "unit": null,
+        "description": null,
+        "enumMappings": [
+          {
+            "value": 1,
+            "label": "Active"
+          }
+        ]
+      },
+      {
+        "name": "signal-quality-indicator",
+        "label": "Signal Quality Indicator",
+        "bitOffset": 2,
+        "bitLength": 2,
+        "type": "enum",
+        "role": "quality",
+        "unit": null,
+        "description": null,
+        "enumMappings": [
+          {
+            "value": 1,
+            "label": "Acceptable"
+          },
+          {
+            "value": 2,
+            "label": "Good"
+          },
+          {
+            "value": 3,
+            "label": "Excellent"
+          }
+        ]
+      },
+      {
+        "name": "scale",
+        "label": "Scale",
+        "bitOffset": 8,
+        "bitLength": 8,
+        "type": "int",
+        "role": "scale",
+        "unit": null,
+        "description": null,
+        "enumMappings": []
+      },
+      {
+        "name": "mv-distance",
+        "label": "MV - Distance",
+        "bitOffset": 16,
+        "bitLength": 16,
+        "type": "enum",
+        "role": "primary_value",
+        "unit": null,
+        "description": null,
+        "enumMappings": [
+          {
+            "value": 32764,
+            "label": "No Measurement Data"
+          },
+          {
+            "value": -32760,
+            "label": "Out of Range - Below Range"
+          },
+          {
+            "value": 32760,
+            "label": "Out of Range - Above Range"
+          }
+        ]
+      }
+    ],
+    "primaryFieldName": "mv-distance"
+  },
+  "isduVariables": [
+    {
+      "key": "25:0:v-functiontag",
+      "name": "V_FunctionTag",
+      "index": 25,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "provides additional tagging posibilities e.g. for a application or job configuration",
+      "enumMappings": []
+    },
+    {
+      "key": "26:0:v-locationtag",
+      "name": "V_LocationTag",
+      "index": 26,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "provides additional tagging posibilities for location of the device",
+      "enumMappings": []
+    },
+    {
+      "key": "58:0:v-ssp-ti-select-t0",
+      "name": "V_SSP_TI_Select-t0",
+      "index": 58,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "shows the current state and progress of a teach-in process",
+      "enumMappings": []
+    },
+    {
+      "key": "59:0:v-ssp-ti-result-t0",
+      "name": "V_SSP_TI_Result-t0",
+      "index": 59,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "shows the current state and progress of a teach-in process",
+      "enumMappings": []
+    },
+    {
+      "key": "60:0:v-ssp-ssc1-spv-t0",
+      "name": "V_SSP_SSC1_SPV-t0",
+      "index": 60,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "setpoint values for switching signal channel 1",
+      "enumMappings": []
+    },
+    {
+      "key": "61:0:v-ssp-ssc1-spc-t0",
+      "name": "V_SSP_SSC1_SPC-t0",
+      "index": 61,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration parameter for switching signal channel 1",
+      "enumMappings": []
+    },
+    {
+      "key": "62:0:v-ssp-ssc2-spv-t0",
+      "name": "V_SSP_SSC2_SPV-t0",
+      "index": 62,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "setpoint values for switching signal channel 2",
+      "enumMappings": []
+    },
+    {
+      "key": "63:0:v-ssp-ssc2-spc-t0",
+      "name": "V_SSP_SSC2_SPC-t0",
+      "index": 63,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration parameter for switching signal channel 2",
+      "enumMappings": []
+    },
+    {
+      "key": "64:0:v-pfo-ssc1-delay1",
+      "name": "V_PFO_SSC1_Delay1",
+      "index": 64,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration of switching delay functions and times for switching channel 1",
+      "enumMappings": []
+    },
+    {
+      "key": "65:0:v-pfo-ssc2-delay1",
+      "name": "V_PFO_SSC2_Delay1",
+      "index": 65,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration of switching delay functions and times for switching channel 1",
+      "enumMappings": []
+    },
+    {
+      "key": "66:0:v-pfo-ssc1-spoffset",
+      "name": "V_PFO_SSC1_SPOffset",
+      "index": 66,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "the setpoint offset defines the switchpoint of the sensor relative to the setpoint",
+      "enumMappings": []
+    },
+    {
+      "key": "67:0:v-pfo-ssc2-spoffset",
+      "name": "V_PFO_SSC2_SPOffset",
+      "index": 67,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "the setpoint offset defines the switchpoint of the sensor relative to the setpoint",
+      "enumMappings": []
+    },
+    {
+      "key": "97:0:v-pfo-eval-filter1",
+      "name": "V_PFO_Eval_Filter1",
+      "index": 97,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration of filtering may help solve critical applications",
+      "enumMappings": []
+    },
+    {
+      "key": "98:0:v-pfo-eval-mvoffset",
+      "name": "V_PFO_Eval_MVOffset",
+      "index": 98,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "offset for calibration of zero reference for a certain mounting situation",
+      "enumMappings": []
+    },
+    {
+      "key": "104:0:v-pfs-pd-config",
+      "name": "V_PFS_PD_Config",
+      "index": 104,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "allows enabling or disabling specific functions controlled by PD Output",
+      "enumMappings": []
+    },
+    {
+      "key": "113:0:v-pfo-io-iqtype",
+      "name": "V_PFO_IO_IQType",
+      "index": 113,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configures the output or input characteristic at pin 2 or white wire",
+      "enumMappings": []
+    },
+    {
+      "key": "117:0:v-pfo-io-outfunc",
+      "name": "V_PFO_IO_OutFunc",
+      "index": 117,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration of the specific function at the additional I/O terminal if configured as output",
+      "enumMappings": []
+    },
+    {
+      "key": "118:0:v-pfo-io-infunc",
+      "name": "V_PFO_IO_InFunc",
+      "index": 118,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "configuration of the specific function at the additional I/O terminal if configured as input",
+      "enumMappings": []
+    },
+    {
+      "key": "120:0:v-pfs-event-config",
+      "name": "V_PFS_Event_Config",
+      "index": 120,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "different event sources can be en- or disabled",
+      "enumMappings": []
+    },
+    {
+      "key": "125:0:v-pfo-device-control",
+      "name": "V_PFO_Device_Control",
+      "index": 125,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "allows setting the device into different operational states e.g. for diagnosis purposes",
+      "enumMappings": []
+    },
+    {
+      "key": "126:0:v-pfo-ui-control",
+      "name": "V_PFO_UI_Control",
+      "index": 126,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "UI Control",
+      "enumMappings": []
+    },
+    {
+      "key": "127:0:v-pfo-ui-indicationcontrol",
+      "name": "V_PFO_UI_IndicationControl",
+      "index": 127,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "Indication Control",
+      "enumMappings": []
+    },
+    {
+      "key": "224:0:v-pfs-opm-operhour",
+      "name": "V_PFS_OPM_OperHour",
+      "index": 224,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "shows the overall hours of operation",
+      "enumMappings": []
+    },
+    {
+      "key": "225:0:v-pfs-opm-tempind",
+      "name": "V_PFS_OPM_TempInd",
+      "index": 225,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "indicates operation at critical ambient temperatures or excess of specification limits",
+      "enumMappings": []
+    },
+    {
+      "key": "232:0:v-pfs-device-char",
+      "name": "V_PFS_Device_Char",
+      "index": 232,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "key characteristics for device operation",
+      "enumMappings": []
+    },
+    {
+      "key": "236:0:v-pfs-measdata",
+      "name": "V_PFS_MeasData",
+      "index": 236,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "Measurement Data",
+      "enumMappings": []
+    },
+    {
+      "key": "238:0:v-pfo-device-stateflags",
+      "name": "V_PFO_Device_StateFlags",
+      "index": 238,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "current sensor state information",
+      "enumMappings": []
+    },
+    {
+      "key": "239:0:v-pfo-io-feature",
+      "name": "V_PFO_IO_Feature",
+      "index": 239,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "descriptor for the available features at the electrical interface",
+      "enumMappings": []
+    },
+    {
+      "key": "16512:0:v-ssp-mdc-descriptor",
+      "name": "V_SSP_MDC_Descriptor",
+      "index": 16512,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": "descriptor for interpretation of the measurement data channel (process data MV)",
+      "enumMappings": []
+    }
+  ]
+}

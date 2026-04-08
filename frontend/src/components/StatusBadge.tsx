@@ -1,6 +1,6 @@
 import { memo } from 'react'
 
-type StatusTone = 'normal' | 'warning' | 'critical' | 'neutral'
+export type StatusTone = 'normal' | 'warning' | 'critical' | 'neutral'
 
 interface StatusBadgeProps {
   label: string

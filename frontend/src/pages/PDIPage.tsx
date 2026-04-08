@@ -1,4 +1,5 @@
 import { useMonitoringWorkspaceContext } from '../context/MonitoringWorkspaceContext'
+import { formatHistoryWindow } from '../utils/history'
 import PortCard from '../components/PortCard'
 import StatusBadge from '../components/StatusBadge'
 
@@ -14,10 +15,16 @@ function PDIPage({ onOpenOverview }: PDIPageProps) {
     resolvedPortDisplayConfigs,
     portDisplayOverrides,
     featuredDecodesByPort,
+    trendSeriesByPort,
+    historySnapshot,
+    historyWindowMs,
     communicationPresentation,
     backendModeLabel,
     updatePortDisplayOverride,
   } = workspace
+  const historyWindowLabel = formatHistoryWindow(
+    historySnapshot?.history_window_ms ?? historyWindowMs,
+  )
 
   return (
     <div className="workspace-page workspace-page--monitor">
@@ -26,7 +33,7 @@ function PDIPage({ onOpenOverview }: PDIPageProps) {
           <p className="section-kicker">PDI monitor</p>
           <h2 className="page-title">Live process matrix</h2>
           <p className="page-description">
-            All eight ports, live values, recent movement, and only the signals
+            All eight ports, live decoded values, and only the process signals
             operators need at a glance.
           </p>
         </div>
@@ -57,6 +64,8 @@ function PDIPage({ onOpenOverview }: PDIPageProps) {
               displayConfig={resolvedPortDisplayConfigs[snapshot.portNumber]}
               displayOverride={portDisplayOverrides[snapshot.portNumber] ?? null}
               featuredPreview={featuredDecodesByPort[snapshot.portNumber]}
+              trendSeries={trendSeriesByPort[snapshot.portNumber]}
+              historyWindowLabel={historyWindowLabel}
               onOverrideChange={updatePortDisplayOverride}
               onOpenOverview={onOpenOverview}
             />

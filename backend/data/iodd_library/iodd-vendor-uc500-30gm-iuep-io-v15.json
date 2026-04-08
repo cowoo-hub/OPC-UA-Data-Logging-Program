@@ -1,0 +1,554 @@
+{
+  "profileId": "iodd:vendor:uc500-30gm-iuep-io-v15",
+  "parserVersion": 2,
+  "source": "iodd",
+  "fileName": "Pepperl-Fuchs_UC500-30GM-20131029-IODD1.0.1.xml",
+  "uploadedAtUtc": "2026-04-07T09:44:46.268483+00:00",
+  "vendorId": null,
+  "vendorName": null,
+  "deviceId": null,
+  "deviceName": "UC500-30GM-IUEP-IO-V15",
+  "deviceFamily": "Ultraschall Distanzsensor",
+  "productId": null,
+  "processDataInBitLength": 16,
+  "processDataOutBitLength": null,
+  "processDataProfile": {
+    "id": "iodd:vendor:uc500-30gm-iuep-io-v15",
+    "name": "UC500-30GM-IUEP-IO-V15",
+    "description": "IODD-derived profile for UC500-30GM-IUEP-IO-V15",
+    "deviceKey": "UC500-30GM-IUEP-IO-V15",
+    "vendorId": null,
+    "deviceId": null,
+    "totalBitLength": 16,
+    "sourceWordCount": 1,
+    "fields": [
+      {
+        "name": "pd-distbdc",
+        "label": "PD DistBDC",
+        "bitOffset": 0,
+        "bitLength": 16,
+        "type": "uint",
+        "role": "primary_value",
+        "unit": null,
+        "description": null,
+        "enumMappings": []
+      }
+    ],
+    "primaryFieldName": "pd-distbdc"
+  },
+  "isduVariables": [
+    {
+      "key": "60:0:v-bdc1-spv",
+      "name": "V_BDC1_SPV",
+      "index": 60,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "61:0:v-bdc1-spc",
+      "name": "V_BDC1_SPC",
+      "index": 61,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "62:0:v-bdc2-spv",
+      "name": "V_BDC2_SPV",
+      "index": 62,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "63:0:v-bdc2-spc",
+      "name": "V_BDC2_SPC",
+      "index": 63,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "64:0:v-bdc-spboff",
+      "name": "V_BDC_SPBoff",
+      "index": 64,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "65:0:v-bdc-delay",
+      "name": "V_BDC_Delay",
+      "index": 65,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "66:0:v-adc1-spv",
+      "name": "V_ADC1_SPV",
+      "index": 66,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "67:0:v-adc1-spc",
+      "name": "V_ADC1_SPC",
+      "index": 67,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Fallende Rampe"
+        },
+        {
+          "value": 2,
+          "label": "Nullpunkts-Gerade"
+        }
+      ]
+    },
+    {
+      "key": "95:0:v-measdata",
+      "name": "V_MeasData",
+      "index": 95,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 16383,
+          "label": "Kein Echo"
+        },
+        {
+          "value": 1,
+          "label": "Signal: 1 aktiv   / 2 inaktiv"
+        },
+        {
+          "value": 2,
+          "label": "Signal: 1 inaktiv / 2 aktiv"
+        },
+        {
+          "value": 3,
+          "label": "Signal: 1 aktiv   / 2 aktiv"
+        }
+      ]
+    },
+    {
+      "key": "97:0:v-measmode",
+      "name": "V_MeasMode",
+      "index": 97,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "mittel"
+        },
+        {
+          "value": 2,
+          "label": "breit"
+        },
+        {
+          "value": 3,
+          "label": "dirac"
+        }
+      ]
+    },
+    {
+      "key": "98:0:v-evalmode",
+      "name": "V_EvalMode",
+      "index": 98,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Arithmetischer Mittelwert"
+        },
+        {
+          "value": 2,
+          "label": "Tiefpass"
+        },
+        {
+          "value": 3,
+          "label": "Adaptiv"
+        },
+        {
+          "value": 32,
+          "label": "Mittelung 2 - Unterdrücken 0"
+        },
+        {
+          "value": 48,
+          "label": "Mittelung 3 - Unterdrücken 0"
+        },
+        {
+          "value": 49,
+          "label": "Mittelung 3 - Unterdrücken 1"
+        },
+        {
+          "value": 64,
+          "label": "Mittelung 4 - Unterdrücken 0"
+        },
+        {
+          "value": 65,
+          "label": "Mittelung 4 - Unterdrücken 1"
+        },
+        {
+          "value": 80,
+          "label": "Mittelung 5 - Unterdrücken 0"
+        },
+        {
+          "value": 81,
+          "label": "Mittelung 5 - Unterdrücken 1"
+        },
+        {
+          "value": 82,
+          "label": "Mittelung 5 - Unterdrücken 2"
+        },
+        {
+          "value": 96,
+          "label": "Mittelung 6 - Unterdrücken 0"
+        },
+        {
+          "value": 97,
+          "label": "Mittelung 6 - Unterdrücken 1"
+        },
+        {
+          "value": 98,
+          "label": "Mittelung 6 - Unterdrücken 2"
+        },
+        {
+          "value": 112,
+          "label": "Mittelung 7 - Unterdrücken 0"
+        },
+        {
+          "value": 113,
+          "label": "Mittelung 7 - Unterdrücken 1"
+        },
+        {
+          "value": 114,
+          "label": "Mittelung 7 - Unterdrücken 2"
+        },
+        {
+          "value": 115,
+          "label": "Mittelung 7 - Unterdrücken 3"
+        },
+        {
+          "value": 128,
+          "label": "Mittelung 8 - Unterdrücken 0"
+        },
+        {
+          "value": 129,
+          "label": "Mittelung 8 - Unterdrücken 1"
+        },
+        {
+          "value": 130,
+          "label": "Mittelung 8 - Unterdrücken 2"
+        },
+        {
+          "value": 131,
+          "label": "Mittelung 8 - Unterdrücken 3"
+        }
+      ]
+    },
+    {
+      "key": "99:0:v-adc1-pdmode",
+      "name": "V_ADC1_PDMode",
+      "index": 99,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Nullpunktgerade normalisiert"
+        },
+        {
+          "value": 2,
+          "label": "Steigende Rampe normalisiert"
+        }
+      ]
+    },
+    {
+      "key": "100:0:v-ctrltemp",
+      "name": "V_CtrlTemp",
+      "index": 100,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "eingeschaltet"
+        }
+      ]
+    },
+    {
+      "key": "101:0:v-ctrlsync",
+      "name": "V_CtrlSync",
+      "index": 101,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Standard synchronisiert"
+        },
+        {
+          "value": 2,
+          "label": "Standard freilaufend"
+        },
+        {
+          "value": 3,
+          "label": "Extern synchronisiert"
+        },
+        {
+          "value": 4,
+          "label": "Master"
+        },
+        {
+          "value": 5,
+          "label": "Slave"
+        }
+      ]
+    },
+    {
+      "key": "102:0:v-conferror",
+      "name": "V_ConfError",
+      "index": 102,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Warnung"
+        },
+        {
+          "value": 2,
+          "label": "Fehler"
+        },
+        {
+          "value": 3,
+          "label": "Alarm"
+        }
+      ]
+    },
+    {
+      "key": "103:0:v-ctrlaccess",
+      "name": "V_CtrlAccess",
+      "index": 103,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Eingeschaltet"
+        }
+      ]
+    },
+    {
+      "key": "112:0:v-ocf",
+      "name": "V_OCF",
+      "index": 112,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "N-schaltend"
+        },
+        {
+          "value": 2,
+          "label": "P-schaltend"
+        },
+        {
+          "value": 3,
+          "label": "Hochohmig"
+        }
+      ]
+    },
+    {
+      "key": "113:0:v-loc",
+      "name": "V_LOC",
+      "index": 113,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Gesperrt"
+        },
+        {
+          "value": 2,
+          "label": "Zeitschloss gesichert"
+        }
+      ]
+    },
+    {
+      "key": "127:0:v-lic",
+      "name": "V_LIC",
+      "index": 127,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "Lokalisierungsanzeige"
+        }
+      ]
+    },
+    {
+      "key": "192:0:v-ut1",
+      "name": "V_UT1",
+      "index": 192,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "193:0:v-ut2",
+      "name": "V_UT2",
+      "index": 193,
+      "subindex": 0,
+      "accessRights": "rw",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "224:0:v-systime",
+      "name": "V_SysTime",
+      "index": 224,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "225:0:v-opertemp",
+      "name": "V_OperTemp",
+      "index": 225,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "232:0:v-devchar",
+      "name": "V_DevChar",
+      "index": 232,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": []
+    },
+    {
+      "key": "239:0:v-feature",
+      "name": "V_Feature",
+      "index": 239,
+      "subindex": 0,
+      "accessRights": "ro",
+      "dataType": null,
+      "bitLength": null,
+      "unit": null,
+      "description": null,
+      "enumMappings": [
+        {
+          "value": 1,
+          "label": "wahr"
+        }
+      ]
+    }
+  ]
+}

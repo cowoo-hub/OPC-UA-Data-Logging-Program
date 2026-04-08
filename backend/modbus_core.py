@@ -6,7 +6,14 @@ import logging
 from dataclasses import asdict, dataclass
 from typing import Literal, Protocol, Sequence
 
-from pymodbus.client import ModbusTcpClient
+try:
+    from pymodbus.client import ModbusTcpClient
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Missing critical backend dependency 'pymodbus'. "
+        "Activate the project virtual environment and install backend/requirements.txt "
+        "(expected pymodbus==3.8.6) before starting the backend."
+    ) from exc
 
 
 BackendMode = Literal["real", "simulator"]
