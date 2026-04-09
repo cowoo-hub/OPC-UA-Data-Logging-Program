@@ -25,8 +25,12 @@ The backend continuously reads Process Data (PDI) from each port and processes i
 
 ## System Concept
 
-This system mimics a PLC-level data acquisition architecture, where:
+Masterway is not designed to replace PLC systems.
 
-- IO-Link Master acts as field gateway
-- Modbus TCP replaces traditional PLC communication
-- Backend acts as a virtual controller + analytics engine
+Instead, it provides a PC-based monitoring and diagnostics layer that allows engineers to observe and analyze IO-Link data with PLC-level responsiveness from a control-room environment.
+
+It enables:
+
+- Fast and intuitive monitoring similar to PLC/HMI systems
+- Centralized visibility across multiple IO-Link ports
+- Enhanced diagnostics beyond traditional PLC capabilities
