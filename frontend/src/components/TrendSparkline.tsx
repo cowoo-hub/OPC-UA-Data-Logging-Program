@@ -14,8 +14,11 @@ interface TrendSparklineProps {
 
 const VIEWBOX_WIDTH = 180
 const VIEWBOX_HEIGHT = 64
-const CHART_PADDING_X = 0.75
+const DEFAULT_CHART_PADDING_X = 8
+const CARD_CHART_PADDING_X = 14
 const CHART_PADDING_Y = 8
+const CLIP_MARGIN_X = 3
+const CLIP_MARGIN_Y = 3
 const SMOOTHING_WEIGHTS = [1, 2, 3, 2, 1] as const
 const SMOOTHING_BLEND = 0.68
 
@@ -165,9 +168,10 @@ function TrendSparkline({
   variant = 'default',
 }: TrendSparklineProps) {
   const isCard = variant === 'card'
-  const chartPaddingX = isCard ? 0 : CHART_PADDING_X
+  const chartPaddingX = isCard ? CARD_CHART_PADDING_X : DEFAULT_CHART_PADDING_X
   const chartPaddingY = CHART_PADDING_Y
   const gradientId = useId()
+  const clipPathId = useId()
   const chartPaths = useMemo(
     () =>
       buildTrendPath(series, {
@@ -176,6 +180,10 @@ function TrendSparkline({
       }),
     [chartPaddingX, chartPaddingY, series],
   )
+  const clipRectX = Math.max(0, chartPaddingX - CLIP_MARGIN_X)
+  const clipRectY = Math.max(0, chartPaddingY - CLIP_MARGIN_Y)
+  const clipRectWidth = Math.max(1, VIEWBOX_WIDTH - clipRectX * 2)
+  const clipRectHeight = Math.max(1, VIEWBOX_HEIGHT - clipRectY * 2)
   const trendTone =
     series.status === 'unavailable'
       ? 'neutral'
@@ -217,6 +225,14 @@ function TrendSparkline({
               <stop offset="0%" stopColor="currentColor" stopOpacity="0.12" />
               <stop offset="100%" stopColor="currentColor" stopOpacity="0.01" />
             </linearGradient>
+            <clipPath id={clipPathId}>
+              <rect
+                x={clipRectX}
+                y={clipRectY}
+                width={clipRectWidth}
+                height={clipRectHeight}
+              />
+            </clipPath>
           </defs>
 
           {[0.25, 0.5, 0.75].map((ratio) => (
@@ -230,24 +246,30 @@ function TrendSparkline({
             />
           ))}
 
-          {chartPaths.areaPath ? (
-            <path d={chartPaths.areaPath} fill={`url(#${gradientId})`} className="trend-sparkline__area" />
-          ) : null}
+          <g clipPath={`url(#${clipPathId})`}>
+            {chartPaths.areaPath ? (
+              <path
+                d={chartPaths.areaPath}
+                fill={`url(#${gradientId})`}
+                className="trend-sparkline__area"
+              />
+            ) : null}
 
-          {chartPaths.linePath ? (
-            <>
-              <path d={chartPaths.linePath} className="trend-sparkline__line-glow" />
-              <path d={chartPaths.linePath} className="trend-sparkline__line" />
-            </>
-          ) : (
-            <line
-              x1={chartPaddingX}
-              x2={VIEWBOX_WIDTH - chartPaddingX}
-              y1={VIEWBOX_HEIGHT / 2}
-              y2={VIEWBOX_HEIGHT / 2}
-              className="trend-sparkline__line trend-sparkline__line--placeholder"
-            />
-          )}
+            {chartPaths.linePath ? (
+              <>
+                <path d={chartPaths.linePath} className="trend-sparkline__line-glow" />
+                <path d={chartPaths.linePath} className="trend-sparkline__line" />
+              </>
+            ) : (
+              <line
+                x1={chartPaddingX}
+                x2={VIEWBOX_WIDTH - chartPaddingX}
+                y1={VIEWBOX_HEIGHT / 2}
+                y2={VIEWBOX_HEIGHT / 2}
+                className="trend-sparkline__line trend-sparkline__line--placeholder"
+              />
+            )}
+          </g>
         </svg>
       </div>
 

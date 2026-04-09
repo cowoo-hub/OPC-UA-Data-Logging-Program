@@ -56,14 +56,14 @@ function mapTrend(direction: DiagnosticForecastDirection): {
 } {
   switch (direction) {
     case 'rising':
-      return { arrow: '↑', label: 'Increasing', tone: 'warning' }
+      return { arrow: '^', label: 'Increasing', tone: 'warning' }
     case 'falling':
-      return { arrow: '↓', label: 'Decreasing', tone: 'normal' }
+      return { arrow: 'v', label: 'Decreasing', tone: 'normal' }
     case 'stable':
-      return { arrow: '→', label: 'Stable', tone: 'neutral' }
+      return { arrow: '=', label: 'Stable', tone: 'neutral' }
     case 'unknown':
     default:
-      return { arrow: '→', label: 'Unknown', tone: 'neutral' }
+      return { arrow: '?', label: 'Unknown', tone: 'neutral' }
   }
 }
 
@@ -150,7 +150,7 @@ function ThinIntelligenceBar() {
       <div className="thin-intelligence-bar__brand" aria-label="Masterway">
         <img
           className="thin-intelligence-bar__logo"
-          src="/masterway-logo-transparent.png"
+          src="/masterway-logo-ui.png"
           alt="Masterway"
         />
       </div>

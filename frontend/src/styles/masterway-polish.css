@@ -1,0 +1,119 @@
+:root {
+  --masterway-brand-surface:
+    linear-gradient(180deg, rgba(17, 25, 35, 0.96), rgba(11, 17, 24, 0.94)),
+    radial-gradient(circle at 16% 0%, rgba(100, 220, 255, 0.055), transparent 32%);
+  --masterway-brand-shell:
+    linear-gradient(180deg, rgba(12, 19, 28, 0.96), rgba(9, 14, 21, 0.92)),
+    radial-gradient(circle at 18% 0%, rgba(100, 220, 255, 0.04), transparent 34%);
+  --masterway-footer-surface:
+    linear-gradient(180deg, rgba(13, 19, 28, 0.9), rgba(9, 14, 21, 0.86)),
+    radial-gradient(circle at 10% 0%, rgba(100, 220, 255, 0.035), transparent 30%);
+}
+
+.app-rail {
+  gap: var(--space-2);
+}
+
+.rail-brand {
+  min-height: 126px;
+  padding: 0.56rem;
+  background: var(--masterway-brand-surface);
+  box-shadow:
+    var(--shadow-lg),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.rail-brand__logo-shell {
+  min-height: 108px;
+  padding: 0.68rem 0.58rem;
+  background: var(--masterway-brand-shell);
+  border-color: rgba(255, 255, 255, 0.042);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.022),
+    inset 0 -18px 30px rgba(3, 8, 14, 0.22);
+}
+
+.rail-brand__logo {
+  width: min(188px, 100%);
+  max-height: 98px;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.16));
+}
+
+.connection-bar__brand,
+.thin-intelligence-bar__brand {
+  background: var(--masterway-brand-shell);
+  border-color: rgba(255, 255, 255, 0.042);
+}
+
+.app-footer {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  gap: 0.58rem;
+  width: 100%;
+  margin-top: auto;
+  padding: 0.56rem 0.68rem;
+  background: var(--masterway-footer-surface);
+  border: 1px solid rgba(255, 255, 255, 0.042);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 8px 18px rgba(3, 8, 14, 0.14);
+  overflow: hidden;
+}
+
+.app-footer__linkedin {
+  width: 1.24rem;
+  height: 1.24rem;
+  margin: 0;
+  align-self: center;
+}
+
+.app-footer__text {
+  align-self: center;
+  justify-self: start;
+  max-width: 100%;
+  font-size: 0.72rem;
+  line-height: 1.28;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+.monitor-card__trend {
+  padding: 0.14rem 0.12rem 0.1rem;
+}
+
+.trend-sparkline--card {
+  padding: 0.18rem;
+}
+
+.trend-sparkline--card .trend-sparkline__canvas {
+  padding: 0.32rem 0.44rem 0.26rem;
+  border-color: rgba(120, 179, 235, 0.06);
+  background:
+    linear-gradient(180deg, rgba(74, 130, 172, 0.08), rgba(10, 18, 28, 0.12)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 100%;
+}
+
+.trend-sparkline--card .trend-sparkline__canvas svg,
+.history-chart svg {
+  overflow: hidden;
+}
+
+@media (max-width: 920px) {
+  .rail-brand {
+    min-height: 118px;
+  }
+
+  .app-footer {
+    padding: 0.52rem 0.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-footer {
+    align-items: start;
+  }
+}

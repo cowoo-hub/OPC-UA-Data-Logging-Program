@@ -100,7 +100,7 @@ function ConnectionBar() {
       <div className="connection-bar__brand" aria-label="Masterway">
         <img
           className="connection-bar__logo"
-          src="/masterway-logo-transparent.png"
+          src="/masterway-logo-ui.png"
           alt="Masterway"
         />
       </div>

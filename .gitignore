@@ -30,6 +30,8 @@ Thumbs.db
 # Build/cache
 dist/
 build/
+node_modules/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.restart-logs/

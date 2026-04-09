@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import ConnectionBar from './components/ConnectionBar'
+import Footer from './components/Footer'
 import { useMonitoringWorkspaceContext } from './context/MonitoringWorkspaceContext'
 import { MonitoringWorkspaceProvider } from './context/MonitoringWorkspaceProvider'
 import AIDiagnosticsPage from './pages/AIDiagnosticsPage'
@@ -104,7 +105,7 @@ function AppShell() {
           <div className="rail-brand__logo-shell" aria-label="Masterway">
             <img
               className="rail-brand__logo"
-              src="/masterway-logo-transparent.png"
+              src="/masterway-logo-ui.png"
               alt="Masterway"
             />
           </div>
@@ -122,6 +123,8 @@ function AppShell() {
             </button>
           ))}
         </nav>
+
+        <Footer />
       </aside>
 
       <main className={`workspace-shell workspace-shell--${activePage}`}>
@@ -141,10 +144,6 @@ function AppShell() {
         {activePage === 'isdu' ? <ISDUPage /> : null}
         {activePage === 'ai' ? <AIDiagnosticsPage /> : null}
       </main>
-
-      <div className="app-credit" aria-label="Developer credit">
-        Developed by Hye In, Woo (Wayne)
-      </div>
     </div>
   )
 }
