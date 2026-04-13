@@ -66,6 +66,8 @@ export interface HealthResponse {
     pymodbus?: string
     python_multipart?: string
   }
+  opcua?: OpcUaStatus | null
+  display_sync_updated_at?: string | null
 }
 
 export interface PollingStatus {
@@ -96,6 +98,76 @@ export interface ConnectionStatusResponse {
   configured: boolean
   connection: ConnectionInfo | null
   polling?: PollingStatus
+}
+
+export interface OpcUaStatus {
+  enabled: boolean
+  configured: boolean
+  running: boolean
+  endpoint: string
+  namespace_uri: string
+  server_name?: string
+  namespace_index: number | null
+  security_mode: 'none' | string
+  anonymous: boolean
+  writable: boolean
+  last_error: string | null
+  last_update_at: string | null
+}
+
+export interface OpcUaStatusResponse {
+  opcua: OpcUaStatus | null
+  connection: {
+    configured: boolean
+    connection: ConnectionInfo | null
+    polling: PollingStatus
+  }
+  polling: PollingStatus
+}
+
+export interface OpcUaNodePreview {
+  key: string
+  browse_path: string
+  value: string | number | boolean | Array<string | number | boolean | null> | null
+  data_type: string
+  updated_at: string | null
+}
+
+export interface OpcUaNodePreviewResponse {
+  opcua: OpcUaStatus | null
+  polling: PollingStatus
+  count: number
+  nodes: OpcUaNodePreview[]
+}
+
+export interface OpcUaConfigRequest {
+  enabled: boolean
+  host: string
+  port: number
+  path: string
+  namespace_uri: string
+  server_name: string
+  security_mode: 'none'
+  anonymous: boolean
+  writable: boolean
+}
+
+export interface OpcUaConfigResponse {
+  updated: boolean
+  opcua: OpcUaStatus
+}
+
+export interface OpcUaDraft {
+  enabled: boolean
+  endpointUrl: string
+  host: string
+  port: string
+  path: string
+  namespaceUri: string
+  serverName: string
+  securityMode: 'none'
+  anonymous: boolean
+  writable: boolean
 }
 
 export interface ConnectRequest {
@@ -512,6 +584,21 @@ export interface PortDisplayConfig {
   isCustomized: boolean
 }
 
+export interface DisplaySyncPortPayload {
+  config: PortDisplayConfig
+  processDataProfile: ProcessDataProfileDefinition | null
+}
+
+export interface DisplaySyncRequest {
+  ports: Record<number, DisplaySyncPortPayload>
+}
+
+export interface DisplaySyncResponse {
+  updated: boolean
+  count: number
+  updatedAt: string | null
+}
+
 export interface ConnectionDraft {
   mode: BackendMode
   host: string
@@ -609,6 +696,26 @@ export interface PortDiagnosticSignalQuality {
   summary: string
 }
 
+export type AiLearningStatus = 'not_started' | 'learning' | 'trained' | 'insufficient_data'
+
+export interface AiLearningModel {
+  status: AiLearningStatus
+  startedAtMs: number | null
+  targetEndAtMs: number | null
+  completedAtMs: number | null
+  durationMs: number
+  sampleCount: number
+  baselineValue: number | null
+  minimumValue: number | null
+  maximumValue: number | null
+  standardDeviation: number | null
+  mad: number | null
+  bandHalfWidth: number | null
+  label: string
+  unit: string
+  message: string
+}
+
 export interface PortDiagnostic {
   portNumber: number
   level: DiagnosticLevel
@@ -624,6 +731,7 @@ export interface PortDiagnostic {
   evidence: PortDiagnosticEvidence[]
   forecast: PortDiagnosticForecast
   signalQuality: PortDiagnosticSignalQuality
+  learning: AiLearningModel
   liveValue: string | null
   liveNumericValue: number | null
   trendStatus: 'ready' | 'fallback' | 'unavailable'

@@ -19,16 +19,23 @@ import {
   fetchAllPortsPdi,
   fetchConnectionStatus,
   fetchIoddLibrary,
+  fetchOpcUaStatus,
+  syncDisplayConfigs,
+  updateOpcUaConfig,
 } from '../api/client'
 import type {
   AllPortsHistoryResponse,
   AllPortsPdiResponse,
+  AiLearningModel,
   CommunicationState,
   ConnectionDraft,
   ConnectionInfo,
   ConnectionStatusResponse,
   DecodedPreview,
   IoddDeviceProfile,
+  OpcUaConfigRequest,
+  OpcUaDraft,
+  OpcUaStatus,
   ParsedProcessDataProfile,
   PortDiagnostic,
   PortDecodeCollection,
@@ -39,6 +46,7 @@ import type {
   PortSeverity,
   PortSnapshot,
   PdiResponse,
+  ProcessDataProfileDefinition,
 } from '../api/types'
 import {
   applyResolutionToPreview,
@@ -69,9 +77,19 @@ import {
   buildPortDiagnostic,
   countDiagnosticLevels,
 } from '../utils/diagnostics'
+import {
+  createInitialAiLearningModels,
+  loadAiLearningModels,
+  resetAiLearningModel,
+  saveAiLearningModels,
+  startAiLearningModel,
+  updateCompletedAiLearningModels,
+} from '../utils/aiLearning'
 
 export const PORT_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8]
 export const DEFAULT_HISTORY_WINDOW_MS = 30000
+const OPCUA_STATUS_REFRESH_MS = 1000
+const OPCUA_STARTUP_WAIT_ATTEMPTS = 12
 
 export type StatusTone = 'normal' | 'warning' | 'critical' | 'neutral'
 
@@ -118,11 +136,15 @@ export interface MonitoringWorkspace {
   selectedPortOverride: PortDisplayOverride | null
   selectedPortDisplayConfig: PortDisplayConfig
   selectedPortDiagnostic: PortDiagnostic
+  aiLearningModels: Record<number, AiLearningModel>
   connectionDraft: ConnectionDraft
+  opcUaStatus: OpcUaStatus | null
+  opcUaDraft: OpcUaDraft
   hasLoadedOnce: boolean
   isRefreshing: boolean
   isConnecting: boolean
   isDisconnecting: boolean
+  isSavingOpcUa: boolean
   banner: BannerState
   communicationPresentation: CommunicationPresentation
   severityCounts: {
@@ -146,6 +168,9 @@ export interface MonitoringWorkspace {
   setHistoryWindowMs: (value: number) => void
   setSelectedPortNumber: (value: number) => void
   setConnectionDraft: (value: ConnectionDraft) => void
+  setOpcUaDraft: (value: OpcUaDraft) => void
+  startPortLearning: (portNumber: number, durationMs: number) => void
+  resetPortLearning: (portNumber: number) => void
   refreshDashboard: (options?: {
     initial?: boolean
     allowAutoConnect?: boolean
@@ -155,6 +180,7 @@ export interface MonitoringWorkspace {
   refreshIoddLibrary: () => Promise<void>
   handleConnect: () => Promise<void>
   handleDisconnect: () => Promise<void>
+  handleSaveOpcUa: (overrideDraft?: OpcUaDraft) => Promise<void>
   updatePortDisplayOverride: (portNumber: number, override: PortDisplayOverride) => void
   resetPortDisplay: (portNumber: number) => void
 }
@@ -245,6 +271,66 @@ function buildConnectionDraft(connection: ConnectionInfo | null): ConnectionDraf
     timeout: String(connection?.timeout ?? DEFAULT_REAL_CONNECT_REQUEST.timeout),
     retries: String(connection?.retries ?? DEFAULT_REAL_CONNECT_REQUEST.retries),
   }
+}
+
+function buildOpcUaDraft(status: OpcUaStatus | null): OpcUaDraft {
+  const endpoint = status?.endpoint ?? ''
+  const host = endpoint.match(/^opc\.tcp:\/\/([^:/]+)/)?.[1] ?? '0.0.0.0'
+  const port = String(status?.endpoint.match(/^opc\.tcp:\/\/[^:]+:(\d+)/)?.[1] ?? 4840)
+  const path = endpoint.match(/^opc\.tcp:\/\/[^/]+\/(.+)$/)?.[1] ?? 'masterway'
+  return {
+    enabled: status?.enabled ?? false,
+    endpointUrl: endpoint || `opc.tcp://${host}:${port}/${path}`,
+    host,
+    port,
+    path,
+    namespaceUri: status?.namespace_uri ?? 'urn:masterway:opcua',
+    serverName: status?.server_name ?? 'Masterway OPC UA Server',
+    securityMode: 'none',
+    anonymous: status?.anonymous ?? true,
+    writable: status?.writable ?? false,
+  }
+}
+
+function areOpcUaDraftsEqual(left: OpcUaDraft, right: OpcUaDraft) {
+  return (
+    left.enabled === right.enabled &&
+    left.endpointUrl === right.endpointUrl &&
+    left.host === right.host &&
+    left.port === right.port &&
+    left.path === right.path &&
+    left.namespaceUri === right.namespaceUri &&
+    left.serverName === right.serverName &&
+    left.securityMode === right.securityMode &&
+    left.anonymous === right.anonymous &&
+    left.writable === right.writable
+  )
+}
+
+function parseOpcUaEndpoint(endpointUrl: string) {
+  const trimmedEndpoint = endpointUrl.trim()
+  const match = trimmedEndpoint.match(/^opc\.tcp:\/\/([^:/\s]+):(\d{1,5})(?:\/(.+))?$/)
+
+  if (!match) {
+    return null
+  }
+
+  const port = Number(match[2])
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    return null
+  }
+
+  return {
+    host: match[1],
+    port,
+    path: (match[3] ?? 'masterway').replace(/^\/+/, '').trim() || 'masterway',
+  }
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 }
 
 function buildPortSnapshot(pdi: PdiResponse): PortSnapshot {
@@ -698,18 +784,26 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
   const [portDisplayOverrides, setPortDisplayOverrides] =
     useState<PortDisplayOverrides>(() => loadPortDisplayOverrides())
   const [selectedPortNumber, setSelectedPortNumber] = useState(1)
+  const [aiLearningModels, setAiLearningModels] = useState<Record<number, AiLearningModel>>(
+    () => loadAiLearningModels(PORT_NUMBERS),
+  )
   const [connectionDraft, setConnectionDraft] = useState<ConnectionDraft>(
     buildConnectionDraft(null),
   )
+  const [opcUaStatus, setOpcUaStatus] = useState<OpcUaStatus | null>(null)
+  const [opcUaDraft, setOpcUaDraft] = useState<OpcUaDraft>(() => buildOpcUaDraft(null))
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [isSavingOpcUa, setIsSavingOpcUa] = useState(false)
   const [banner, setBanner] = useState<BannerState>(() => buildBannerFromSnapshot(null))
   const connectionActionRef = useRef(false)
   const historyWindowRef = useRef(historyWindowMs)
   const seedDraftRef = useRef(false)
   const isPollingRef = useRef(false)
+  const opcUaDraftRef = useRef(opcUaDraft)
+  const lastSyncedOpcUaDraftRef = useRef<OpcUaDraft | null>(null)
   const queuedRefreshRef = useRef<RefreshDashboardOptions | null>(null)
   const refreshDashboardRef = useRef<
     (options?: RefreshDashboardOptions) => Promise<void>
@@ -725,12 +819,20 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
   }, [portDisplayOverrides])
 
   useEffect(() => {
+    saveAiLearningModels(aiLearningModels)
+  }, [aiLearningModels])
+
+  useEffect(() => {
     historyWindowRef.current = historyWindowMs
   }, [historyWindowMs])
 
   useEffect(() => {
     connectionActionRef.current = isConnecting || isDisconnecting
   }, [isConnecting, isDisconnecting])
+
+  useEffect(() => {
+    opcUaDraftRef.current = opcUaDraft
+  }, [opcUaDraft])
 
   const refreshIoddLibrary = useCallback(async () => {
     try {
@@ -766,6 +868,52 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       return null
     }
   }, [])
+
+  const refreshOpcUaStatus = useCallback(async (options?: { syncDraft?: boolean }) => {
+    try {
+      const response = await fetchOpcUaStatus()
+      const nextStatus = response.opcua ?? null
+      const nextDraft = buildOpcUaDraft(nextStatus)
+      setOpcUaStatus(response.opcua ?? null)
+      setOpcUaDraft((currentDraft) => {
+        const lastSyncedDraft = lastSyncedOpcUaDraftRef.current
+        const shouldSyncDraft =
+          options?.syncDraft === true ||
+          lastSyncedDraft === null ||
+          areOpcUaDraftsEqual(currentDraft, lastSyncedDraft)
+
+        if (!shouldSyncDraft) {
+          return currentDraft
+        }
+
+        lastSyncedOpcUaDraftRef.current = nextDraft
+        opcUaDraftRef.current = nextDraft
+        return nextDraft
+      })
+      return response.opcua ?? null
+    } catch {
+      setOpcUaStatus(null)
+      return null
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshOpcUaStatus({ syncDraft: true })
+  }, [refreshOpcUaStatus])
+
+  useEffect(() => {
+    if (!opcUaDraft.enabled && !opcUaStatus?.enabled) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshOpcUaStatus()
+    }, OPCUA_STATUS_REFRESH_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [opcUaDraft.enabled, opcUaStatus?.enabled, refreshOpcUaStatus])
 
   const resolveConvertedPreview = useCallback(
     async (
@@ -1048,12 +1196,45 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     }, {})
   }, [historyByPort, resolvedPortDisplayConfigs])
 
+  useEffect(() => {
+    setAiLearningModels((previousModels) =>
+      updateCompletedAiLearningModels(
+        previousModels,
+        trendSeriesByPort,
+        resolvedPortDisplayConfigs,
+      ),
+    )
+  }, [resolvedPortDisplayConfigs, trendSeriesByPort])
+
   const ioddProfilesById = useMemo(() => {
     return ioddProfiles.reduce<Record<string, IoddDeviceProfile>>((accumulator, profile) => {
       accumulator[profile.profileId] = profile
       return accumulator
     }, {})
   }, [ioddProfiles])
+
+  const resolvedProcessDataProfilesByPort = useMemo(() => {
+    return PORT_NUMBERS.reduce<Record<number, ProcessDataProfileDefinition | null>>(
+      (accumulator, portNumber) => {
+        const displayConfig = resolvedPortDisplayConfigs[portNumber]
+        const assignedIoddProfile =
+          displayConfig.processDataProfileId !== null
+            ? ioddProfilesById[displayConfig.processDataProfileId] ?? null
+            : null
+
+        accumulator[portNumber] = resolveProcessDataProfile({
+          mode: displayConfig.processDataMode,
+          requestedProfileId: displayConfig.processDataProfileId,
+          deviceKey: assignedIoddProfile?.productId ?? assignedIoddProfile?.deviceName ?? null,
+          vendorId: assignedIoddProfile?.vendorId ?? null,
+          deviceId: assignedIoddProfile?.deviceId ?? null,
+        }).profile
+
+        return accumulator
+      },
+      {},
+    )
+  }, [ioddProfilesById, resolvedPortDisplayConfigs])
 
   const processDataByPort = useMemo(() => {
     return PORT_NUMBERS.reduce<Record<number, ParsedProcessDataProfile | null>>(
@@ -1072,13 +1253,22 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
           return accumulator
         }
 
-        const resolvedProfile = resolveProcessDataProfile({
-          mode: displayConfig.processDataMode,
-          requestedProfileId: displayConfig.processDataProfileId,
-          deviceKey: assignedIoddProfile?.productId ?? assignedIoddProfile?.deviceName ?? null,
-          vendorId: assignedIoddProfile?.vendorId ?? null,
-          deviceId: assignedIoddProfile?.deviceId ?? null,
-        })
+        const resolvedProfile = {
+          profile: resolvedProcessDataProfilesByPort[portNumber],
+          source:
+            displayConfig.processDataMode === 'manual'
+              ? 'manual_disabled'
+              : displayConfig.processDataMode === 'profile'
+                ? displayConfig.processDataProfileId
+                  ? 'manual_selection'
+                  : 'unresolved'
+                : assignedIoddProfile?.vendorId != null &&
+                    assignedIoddProfile?.deviceId != null
+                  ? 'device_identity'
+                  : assignedIoddProfile?.productId || assignedIoddProfile?.deviceName
+                    ? 'device_key'
+                    : 'unresolved',
+        } as const
 
         accumulator[portNumber] = resolvedProfile.profile
           ? parseProcessDataPayload({
@@ -1094,7 +1284,42 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       },
       {},
     )
-  }, [ioddProfilesById, ports, resolvedPortDisplayConfigs])
+  }, [ioddProfilesById, ports, resolvedPortDisplayConfigs, resolvedProcessDataProfilesByPort])
+
+  const lastDisplaySyncPayloadRef = useRef<string>('')
+
+  useEffect(() => {
+    const payload = {
+      ports: PORT_NUMBERS.reduce<
+        Record<
+          number,
+          {
+            config: PortDisplayConfig
+            processDataProfile: ProcessDataProfileDefinition | null
+          }
+        >
+      >((accumulator, portNumber) => {
+        accumulator[portNumber] = {
+          config: resolvedPortDisplayConfigs[portNumber],
+          processDataProfile: resolvedProcessDataProfilesByPort[portNumber],
+        }
+        return accumulator
+      }, {}),
+    }
+
+    const serializedPayload = serializeValue(payload)
+    if (serializedPayload === lastDisplaySyncPayloadRef.current) {
+      return
+    }
+
+    lastDisplaySyncPayloadRef.current = serializedPayload
+    void syncDisplayConfigs(payload).catch((error) => {
+      console.warn(
+        'Failed to sync display configs for integration mirroring:',
+        error instanceof Error ? error.message : error,
+      )
+    })
+  }, [resolvedPortDisplayConfigs, resolvedProcessDataProfilesByPort])
 
   const selectedPortSnapshot = useMemo(
     () =>
@@ -1284,10 +1509,18 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
         featuredPreview,
         trendSeriesByPort[portNumber] ?? createEmptyTrendSeries(),
         dashboard,
+        aiLearningModels[portNumber] ?? null,
       )
       return accumulator
     }, {})
-  }, [dashboard, featuredDecodesByPort, ports, resolvedPortDisplayConfigs, trendSeriesByPort])
+  }, [
+    aiLearningModels,
+    dashboard,
+    featuredDecodesByPort,
+    ports,
+    resolvedPortDisplayConfigs,
+    trendSeriesByPort,
+  ])
 
   const selectedPortDiagnostic = useMemo(
     () => diagnosticsByPort[selectedPortNumber],
@@ -1411,6 +1644,119 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     }
   }, [refreshDashboard])
 
+  const startPortLearning = useCallback((portNumber: number, durationMs: number) => {
+    setAiLearningModels((previousModels) => ({
+      ...previousModels,
+      [portNumber]: startAiLearningModel(
+        previousModels[portNumber] ??
+          createInitialAiLearningModels([portNumber])[portNumber],
+        durationMs,
+      ),
+    }))
+    setBanner({
+      tone: 'info',
+      title: `Port ${portNumber} learning started`,
+      body: 'Keep the sensor in a known normal condition until the learning window completes.',
+    })
+  }, [])
+
+  const resetPortLearning = useCallback((portNumber: number) => {
+    setAiLearningModels((previousModels) => ({
+      ...previousModels,
+      [portNumber]: resetAiLearningModel(),
+    }))
+    setBanner({
+      tone: 'info',
+      title: `Port ${portNumber} model reset`,
+      body: 'Run Start Learning again before relying on model-based AI diagnostics.',
+    })
+  }, [])
+
+  const handleSaveOpcUa = useCallback(async (overrideDraft?: OpcUaDraft) => {
+    const draftToSave = overrideDraft ?? opcUaDraft
+    const endpointParts = parseOpcUaEndpoint(draftToSave.endpointUrl)
+    const host = endpointParts?.host ?? draftToSave.host.trim()
+    const port = endpointParts?.port ?? Number(draftToSave.port)
+    const path = endpointParts?.path ?? draftToSave.path.trim()
+    const namespaceUri = draftToSave.namespaceUri.trim()
+    const serverName = draftToSave.serverName.trim()
+
+    if (
+      draftToSave.enabled &&
+      (!endpointParts ||
+        !host ||
+        !Number.isInteger(port) ||
+        port <= 0 ||
+        port > 65535 ||
+        !path ||
+        !namespaceUri ||
+        !serverName)
+    ) {
+      setBanner({
+        tone: 'error',
+        title: 'OPC UA settings incomplete',
+        body: 'Enter a valid endpoint such as opc.tcp://127.0.0.1:4840/masterway plus namespace URI and server name.',
+      })
+      return
+    }
+
+    const payload: OpcUaConfigRequest = {
+      enabled: draftToSave.enabled,
+      host: host || '0.0.0.0',
+      port: Number.isInteger(port) && port > 0 ? port : 4840,
+      path: path || 'masterway',
+      namespace_uri: namespaceUri || 'urn:masterway:opcua',
+      server_name: serverName || 'Masterway OPC UA Server',
+      security_mode: 'none',
+      anonymous: draftToSave.anonymous,
+      writable: false,
+    }
+
+    setIsSavingOpcUa(true)
+    try {
+      const response = await updateOpcUaConfig(payload)
+      const syncedDraft = buildOpcUaDraft(response.opcua)
+      setOpcUaStatus(response.opcua)
+      lastSyncedOpcUaDraftRef.current = syncedDraft
+      opcUaDraftRef.current = syncedDraft
+      setOpcUaDraft(syncedDraft)
+
+      let latestStatus: OpcUaStatus | null = response.opcua
+      if (response.opcua.enabled && !response.opcua.running && !response.opcua.last_error) {
+        for (let attempt = 0; attempt < OPCUA_STARTUP_WAIT_ATTEMPTS; attempt += 1) {
+          await wait(OPCUA_STATUS_REFRESH_MS)
+          latestStatus = await refreshOpcUaStatus({ syncDraft: true })
+
+          if (!latestStatus?.enabled || latestStatus.running || latestStatus.last_error) {
+            break
+          }
+        }
+      }
+
+      setBanner({
+        tone: latestStatus?.last_error ? 'warning' : 'success',
+        title: latestStatus?.last_error
+          ? 'OPC UA applied with warning'
+          : 'OPC UA settings applied',
+        body: latestStatus?.last_error
+          ? latestStatus.last_error
+          : latestStatus?.enabled
+            ? latestStatus.running
+              ? `OPC UA server is running at ${latestStatus.endpoint}.`
+              : `OPC UA server is still starting at ${latestStatus.endpoint}.`
+            : 'OPC UA server is now disabled.',
+      })
+    } catch (error) {
+      setBanner({
+        tone: 'error',
+        title: 'OPC UA update failed',
+        body: getErrorMessage(error),
+      })
+    } finally {
+      setIsSavingOpcUa(false)
+    }
+  }, [opcUaDraft, refreshOpcUaStatus])
+
   const updatePortDisplayOverride = useCallback(
     (portNumber: number, override: PortDisplayOverride) => {
       setPortDisplayOverrides((previousOverrides) => {
@@ -1477,11 +1823,15 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       selectedPortOverride,
       selectedPortDisplayConfig,
       selectedPortDiagnostic,
+      aiLearningModels,
       connectionDraft,
+      opcUaStatus,
+      opcUaDraft,
       hasLoadedOnce,
       isRefreshing,
       isConnecting,
       isDisconnecting,
+      isSavingOpcUa,
       banner,
       communicationPresentation,
       severityCounts,
@@ -1497,10 +1847,14 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       setHistoryWindowMs,
       setSelectedPortNumber,
       setConnectionDraft,
+      setOpcUaDraft,
+      startPortLearning,
+      resetPortLearning,
       refreshDashboard,
       refreshIoddLibrary,
       handleConnect,
       handleDisconnect,
+      handleSaveOpcUa,
       updatePortDisplayOverride,
       resetPortDisplay,
     }),
@@ -1509,6 +1863,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       banner,
       communicationPresentation,
       connectionDraft,
+      handleSaveOpcUa,
       connectionMeta,
       connectionSummary,
       dashboard,
@@ -1526,7 +1881,10 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       isConnecting,
       isDisconnecting,
       isRefreshing,
+      isSavingOpcUa,
       lastUpdatedLabel,
+      opcUaDraft,
+      opcUaStatus,
       portDisplayOverrides,
       ports,
       processDataByPort,
@@ -1545,9 +1903,13 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       selectedPortSnapshot,
       selectedPortTrendSeries,
       setConnectionDraft,
+      setOpcUaDraft,
       setHistoryWindowMs,
       setSelectedPortNumber,
+      aiLearningModels,
+      resetPortLearning,
       severityCounts,
+      startPortLearning,
       staleStateLabel,
       staleStateTone,
       trendSeriesByPort,

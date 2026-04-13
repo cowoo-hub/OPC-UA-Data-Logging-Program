@@ -50,7 +50,7 @@ class ICE2Backend(Protocol):
     """
     Shared backend interface for real hardware and simulator implementations.
 
-    The interface is intentionally small so later ISDU, MQTT publishing,
+    The interface is intentionally small so later ISDU, OPC UA exposure,
     polling/caching, and AI diagnostics features can extend it cleanly.
     """
 

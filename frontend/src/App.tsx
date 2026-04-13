@@ -7,10 +7,11 @@ import { MonitoringWorkspaceProvider } from './context/MonitoringWorkspaceProvid
 import AIDiagnosticsPage from './pages/AIDiagnosticsPage'
 import IODDLibraryPage from './pages/IODDLibraryPage'
 import ISDUPage from './pages/ISDUPage'
+import OPCUAPage from './pages/OPCUAPage'
 import PDIPage from './pages/PDIPage'
 import PortOverviewPage from './pages/PortOverviewPage'
 
-type AppPage = 'pdi' | 'overview' | 'iodd' | 'isdu' | 'ai'
+type AppPage = 'pdi' | 'overview' | 'iodd' | 'isdu' | 'opcua' | 'ai'
 
 const navigationItems: Array<{
   id: AppPage
@@ -31,6 +32,10 @@ const navigationItems: Array<{
   {
     id: 'isdu',
     label: 'ISDU',
+  },
+  {
+    id: 'opcua',
+    label: 'OPC UA',
   },
   {
     id: 'ai',
@@ -142,6 +147,7 @@ function AppShell() {
         {activePage === 'overview' ? <PortOverviewPage /> : null}
         {activePage === 'iodd' ? <IODDLibraryPage /> : null}
         {activePage === 'isdu' ? <ISDUPage /> : null}
+        {activePage === 'opcua' ? <OPCUAPage /> : null}
         {activePage === 'ai' ? <AIDiagnosticsPage /> : null}
       </main>
     </div>

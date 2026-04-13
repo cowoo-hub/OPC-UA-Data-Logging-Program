@@ -1,24 +1,17 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 
-import {
-  HISTORY_EXPORT_RANGES,
-  PERF_OVERLAY_ENABLED,
-  downloadPortHistoryCsv,
-  getHistoryExportRangeByWindowMs,
-} from '../api/client'
+import { PERF_OVERLAY_ENABLED } from '../api/client'
 import type {
   DiagnosticForecastDirection,
   DiagnosticLevel,
-  HistoryExportRange,
   PortDiagnostic,
   PortDisplayConfig,
-  PortSnapshot,
 } from '../api/types'
 import AIAnomalyMap from '../components/AIAnomalyMap'
 import AIHolographicCore from '../components/AIHolographicCore'
 import StatusBadge from '../components/StatusBadge'
 import { useMonitoringWorkspaceContext } from '../context/MonitoringWorkspaceContext'
-import { formatLocalDateTimeDisplay } from '../utils/history'
+import { AI_LEARNING_DURATION_OPTIONS } from '../utils/aiLearning'
 
 function getSystemLevel(diagnostics: PortDiagnostic[]): DiagnosticLevel {
   if (diagnostics.some((diagnostic) => diagnostic.level === 'critical')) {
@@ -50,7 +43,7 @@ function getShortPortSummary(diagnostic: PortDiagnostic) {
   const dominantReason = diagnostic.reasons[0]
 
   if (!dominantReason) {
-    return 'Stable within learned band'
+    return 'Stable in normal model'
   }
 
   switch (dominantReason.code) {
@@ -60,7 +53,7 @@ function getShortPortSummary(diagnostic: PortDiagnostic) {
       return dominantReason.title === 'Recovery not yet confirmed'
         ? 'Watch: recovery settling'
         : dominantReason.level === 'critical'
-          ? 'Critical: baseline deviation'
+          ? 'Critical: model deviation'
           : 'Watch: mild drift'
     case 'spike':
       return 'Watch: sudden deviation'
@@ -97,6 +90,18 @@ function getShortPortSummary(diagnostic: PortDiagnostic) {
   }
 }
 
+function formatLearningTime(ms: number | null) {
+  if (ms === null || ms <= 0) {
+    return '--'
+  }
+
+  if (ms < 60000) {
+    return `${Math.ceil(ms / 1000)} s`
+  }
+
+  return `${Math.ceil(ms / 60000)} min`
+}
+
 function buildActionItems(diagnostic: PortDiagnostic) {
   const leadCause = diagnostic.probableCauses[0]
   const firstEvidence = diagnostic.evidence[0]
@@ -130,340 +135,285 @@ function buildActionItems(diagnostic: PortDiagnostic) {
   ]
 }
 
-const AI_EXPORT_RANGE_PATTERNS: Array<{
-  value: HistoryExportRange
-  label: string
-  patterns: RegExp[]
-}> = [
-  {
-    value: '30s',
-    label: 'last 30 seconds',
-    patterns: [/\b30\s*(?:s|sec|secs|second|seconds)\b/i],
-  },
-  {
-    value: '2min',
-    label: 'last 2 minutes',
-    patterns: [/\b2\s*(?:m|min|mins|minute|minutes)\b/i],
-  },
-  {
-    value: '10min',
-    label: 'last 10 minutes',
-    patterns: [/\b10\s*(?:m|min|mins|minute|minutes)\b/i],
-  },
-  {
-    value: '15min',
-    label: 'last 15 minutes',
-    patterns: [/\b15\s*(?:m|min|mins|minute|minutes)\b/i],
-  },
-  {
-    value: '30min',
-    label: 'last 30 minutes',
-    patterns: [/\b30\s*(?:m|min|mins|minute|minutes)\b/i],
-  },
-  {
-    value: '1h',
-    label: 'last 1 hour',
-    patterns: [/\b1\s*(?:h|hr|hour)\b/i, /\b60\s*(?:m|min|mins|minute|minutes)\b/i],
-  },
-]
 
-interface ParsedCustomRange {
-  start: string
-  end: string
-  label: string
+function formatLearningValue(value: number | null, unit = '') {
+  if (value === null || !Number.isFinite(value)) {
+    return '--'
+  }
+
+  const absoluteValue = Math.abs(value)
+  const precision = absoluteValue >= 100 ? 1 : absoluteValue >= 10 ? 2 : 3
+  const formattedValue = value
+    .toFixed(precision)
+    .replace(/\.0+$/, '')
+    .replace(/(\.\d*?)0+$/, '$1')
+
+  return `${formattedValue}${unit ? ` ${unit}` : ''}`
 }
 
-interface ParsedExportIntent {
-  portNumber: number
-  rangeValue: HistoryExportRange | null
-  customRange: ParsedCustomRange | null
-  requiresCustomRangeDetails: boolean
-}
-
-function normalizePromptDateToken(value: string) {
-  const trimmed = value.trim().replace(/\s+/g, ' ')
-
-  if (!trimmed) {
-    return null
-  }
-
-  const isoLikeValue = /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(:\d{2})?$/.test(trimmed)
-    ? trimmed.replace(' ', 'T')
-    : trimmed
-  const parsedTimestamp = new Date(isoLikeValue)
-
-  if (Number.isNaN(parsedTimestamp.valueOf())) {
-    return null
-  }
-
-  return {
-    iso: parsedTimestamp.toISOString(),
-    label: formatLocalDateTimeDisplay(parsedTimestamp),
-    timestampMs: parsedTimestamp.valueOf(),
-  }
-}
-
-function parseCustomExportRange(question: string): ParsedCustomRange | null {
-  const explicitRangeMatch = question.match(/\bfrom\s+(.+?)\s+(?:to|until)\s+(.+)$/i)
-
-  if (!explicitRangeMatch) {
-    return null
-  }
-
-  const start = normalizePromptDateToken(explicitRangeMatch[1])
-  const end = normalizePromptDateToken(explicitRangeMatch[2])
-
-  if (!start || !end || start.timestampMs >= end.timestampMs) {
-    return null
-  }
-
-  return {
-    start: start.iso,
-    end: end.iso,
-    label: `${start.label} to ${end.label}`,
-  }
-}
-
-function parseExportIntent(
-  question: string,
-  {
-    selectedPortNumber,
-    defaultRange,
-  }: {
-    selectedPortNumber: number
-    defaultRange: HistoryExportRange
-  },
-): ParsedExportIntent | null {
-  const normalizedQuestion = question.toLowerCase()
-  const isExportRequest =
-    normalizedQuestion.includes('export') || normalizedQuestion.includes('download')
-
-  if (!isExportRequest) {
-    return null
-  }
-
-  const portMatch = normalizedQuestion.match(/\bport\s+([1-8])\b/)
-  const portNumber = portMatch ? Number(portMatch[1]) : selectedPortNumber
-  const customRange = parseCustomExportRange(question)
-  const matchedRange =
-    AI_EXPORT_RANGE_PATTERNS.find((rangeOption) =>
-      rangeOption.patterns.some((pattern) => pattern.test(question)),
-    )?.value ?? defaultRange
-
-  if (customRange) {
-    return {
-      portNumber,
-      rangeValue: null,
-      customRange,
-      requiresCustomRangeDetails: false,
-    }
-  }
-
-  return {
-    portNumber,
-    rangeValue: matchedRange,
-    customRange: null,
-    requiresCustomRangeDetails: /\bcustom\s+range\b/i.test(question),
-  }
-}
-
-function buildAskAnythingReply(
-  question: string,
-  diagnostic: PortDiagnostic,
-  portNumber: number,
-  displayLabel: string,
-) {
-  const normalizedQuestion = question.toLowerCase()
-  const leadCause = diagnostic.probableCauses[0]
-  const leadEvidence = diagnostic.evidence[0]
-
-  if (
-    normalizedQuestion.includes('why') ||
-    normalizedQuestion.includes('cause') ||
-    normalizedQuestion.includes('reason')
-  ) {
-    return leadCause
-      ? `Port ${portNumber} (${displayLabel}) is reading as ${diagnostic.currentInterpretation}. The strongest cause is ${leadCause.title.toLowerCase()}: ${leadCause.detail}`
-      : `Port ${portNumber} is currently ${diagnostic.currentInterpretation.toLowerCase()}, with no single dominant anomaly driver overriding the learned signal band.`
+function getLearningProgressPercent(learning: PortDiagnostic['learning'], nowMs: number) {
+  if (learning.status === 'trained') {
+    return 100
   }
 
   if (
-    normalizedQuestion.includes('next') ||
-    normalizedQuestion.includes('future') ||
-    normalizedQuestion.includes('predict') ||
-    normalizedQuestion.includes('risk')
+    learning.status !== 'learning' ||
+    learning.startedAtMs === null ||
+    learning.targetEndAtMs === null
   ) {
-    return `Near-term forecast for Port ${portNumber}: ${diagnostic.forecast.summary} Expected state: ${diagnostic.forecast.expectedState}. Escalation probability is ${diagnostic.forecast.worseningProbability}%.`
+    return 0
   }
 
-  if (
-    normalizedQuestion.includes('action') ||
-    normalizedQuestion.includes('do') ||
-    normalizedQuestion.includes('recommend')
-  ) {
-    return `Recommended action for Port ${portNumber}: ${diagnostic.suggestedAction}`
-  }
-
-  if (
-    normalizedQuestion.includes('stable') ||
-    normalizedQuestion.includes('noise') ||
-    normalizedQuestion.includes('band') ||
-    normalizedQuestion.includes('fluctuation')
-  ) {
-    return `Signal quality is ${diagnostic.signalQuality.label}. ${diagnostic.signalQuality.summary}`
-  }
-
-  return leadEvidence
-    ? `Port ${portNumber} is currently ${diagnostic.currentInterpretation.toLowerCase()}. ${leadEvidence.label}: ${leadEvidence.detail}`
-    : `Port ${portNumber} is currently ${diagnostic.currentInterpretation.toLowerCase()}. ${diagnostic.suggestedAction}`
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        ((nowMs - learning.startedAtMs) /
+          Math.max(1, learning.targetEndAtMs - learning.startedAtMs)) *
+          100,
+      ),
+    ),
+  )
 }
 
-interface AIAskAnythingPanelProps {
+interface AILearningResultPanelProps {
   diagnostic: PortDiagnostic
-  portNumber: number
-  displayLabel: string
-  defaultExportRange: HistoryExportRange
-  historyRetentionMs: number
-  portSnapshotsByNumber: Record<number, PortSnapshot>
-  displayConfigsByPort: Record<number, PortDisplayConfig>
-  diagnosticsByPort: Record<number, PortDiagnostic>
-  latestTimestampByPort: Record<number, number | null>
+  displayConfig: PortDisplayConfig
 }
 
-function AIAskAnythingPanel({
+function AILearningResultPanel({
   diagnostic,
-  portNumber,
-  displayLabel,
-  defaultExportRange,
-  historyRetentionMs,
-  portSnapshotsByNumber,
-  displayConfigsByPort,
-  diagnosticsByPort,
-  latestTimestampByPort,
-}: AIAskAnythingPanelProps) {
-  const [askPrompt, setAskPrompt] = useState('')
-  const [askReply, setAskReply] = useState<string | null>(null)
-  const [isHandlingAsk, setIsHandlingAsk] = useState(false)
+  displayConfig,
+}: AILearningResultPanelProps) {
+  const learning = diagnostic.learning
+  const [nowMs, setNowMs] = useState(() => Date.now())
 
-  async function handleAskSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const trimmedPrompt = askPrompt.trim()
-
-    if (!trimmedPrompt) {
-      return
+  useEffect(() => {
+    if (learning.status !== 'learning') {
+      return undefined
     }
 
-    const exportIntent = parseExportIntent(trimmedPrompt, {
-      selectedPortNumber: portNumber,
-      defaultRange: defaultExportRange,
-    })
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(intervalId)
+  }, [learning.status])
 
-    if (exportIntent) {
-      if (exportIntent.requiresCustomRangeDetails) {
-        setAskReply(
-          'Custom CSV export is ready. Ask with exact bounds such as "export CSV from 2026-04-06 09:00 to 2026-04-06 09:30", or use the custom export fields in Port Overview.',
-        )
-        return
-      }
-
-      const targetDisplayConfig = displayConfigsByPort[exportIntent.portNumber]
-      const targetSnapshot = portSnapshotsByNumber[exportIntent.portNumber]
-      const targetDiagnostic = diagnosticsByPort[exportIntent.portNumber]
-      const latestTimestampMs = latestTimestampByPort[exportIntent.portNumber]
-
-      if (!targetDisplayConfig || !targetDiagnostic) {
-        setAskReply(`Port ${exportIntent.portNumber} does not have an exportable profile yet.`)
-        return
-      }
-
-      if (exportIntent.customRange && latestTimestampMs) {
-        const startMs = Date.parse(exportIntent.customRange.start)
-        const endMs = Date.parse(exportIntent.customRange.end)
-        const earliestRetainedMs = latestTimestampMs - historyRetentionMs
-
-        if (startMs < earliestRetainedMs || endMs > latestTimestampMs) {
-          setAskReply(
-            `Custom CSV export for Port ${exportIntent.portNumber} must stay inside retained history: ${formatLocalDateTimeDisplay(earliestRetainedMs)} to ${formatLocalDateTimeDisplay(latestTimestampMs)}.`,
-          )
-          return
-        }
-      }
-
-      setIsHandlingAsk(true)
-
-      try {
-        await downloadPortHistoryCsv({
-          portNumber: exportIntent.portNumber,
-          exportMode: exportIntent.customRange ? 'custom' : 'preset',
-          range: exportIntent.rangeValue ?? undefined,
-          customRange:
-            exportIntent.customRange === null
-              ? undefined
-              : {
-                  start: exportIntent.customRange.start,
-                  end: exportIntent.customRange.end,
-                },
-          displayConfig: targetDisplayConfig,
-          status: targetSnapshot?.severity ?? null,
-          eventCode: targetSnapshot?.pdi
-            ? String(targetSnapshot.pdi.header.event_code.raw)
-            : null,
-          anomalyState: targetDiagnostic.level,
-        })
-
-        setAskReply(
-          exportIntent.customRange
-            ? `CSV export started for Port ${exportIntent.portNumber} using the custom interval ${exportIntent.customRange.label}.`
-            : `CSV export started for Port ${exportIntent.portNumber} using ${AI_EXPORT_RANGE_PATTERNS.find((rangeOption) => rangeOption.value === exportIntent.rangeValue)?.label ?? 'the selected window'}.`,
-        )
-      } catch (exportError) {
-        setAskReply(
-          exportError instanceof Error
-            ? exportError.message
-            : 'CSV export failed.',
-        )
-      } finally {
-        setIsHandlingAsk(false)
-      }
-
-      return
-    }
-
-    setAskReply(buildAskAnythingReply(trimmedPrompt, diagnostic, portNumber, displayLabel))
-  }
+  const unit = learning.unit || displayConfig.engineeringUnit || ''
+  const progress = getLearningProgressPercent(learning, nowMs)
+  const remainingMs =
+    learning.status === 'learning' && learning.targetEndAtMs !== null
+      ? Math.max(0, learning.targetEndAtMs - nowMs)
+      : null
+  const statusTone =
+    learning.status === 'trained'
+      ? 'normal'
+      : learning.status === 'insufficient_data'
+        ? 'warning'
+        : 'neutral'
+  const rangeValue =
+    learning.minimumValue === null || learning.maximumValue === null
+      ? '--'
+      : `${formatLearningValue(learning.minimumValue, unit)} - ${formatLearningValue(
+          learning.maximumValue,
+          unit,
+        )}`
+  const toleranceValue =
+    learning.bandHalfWidth === null
+      ? '--'
+      : `+/- ${formatLearningValue(learning.bandHalfWidth, unit)}`
+  const message =
+    learning.status === 'learning'
+      ? `Collecting normal signal behavior. Remaining ${formatLearningTime(remainingMs)}.`
+      : learning.message
+  const progressStyle = {
+    '--learning-progress': `${progress}%`,
+  } as CSSProperties & Record<'--learning-progress', string>
 
   return (
-    <section className="ai-holo-panel ai-holo-panel--ask">
-      <div className="ai-holo-panel__head">
-        <div>
-          <p className="section-kicker">Ask Anything</p>
-          <h3 className="section-title">Contextual AI collaboration</h3>
+    <section className="ai-holo-panel ai-holo-panel--learning-result">
+      <div className="ai-learning-result__body">
+        <div className="ai-learning-result__message">
+          <div className="ai-learning-result__message-head">
+            <p className="section-kicker">Learning result</p>
+            <StatusBadge
+              label={learning.status.replace('_', ' ').toUpperCase()}
+              tone={statusTone}
+            />
+          </div>
+          <strong>
+            {learning.status === 'trained' ? 'Learned normal envelope ready' : 'Model readiness'}
+          </strong>
+          <p>{message}</p>
+          <div className="ai-learning-result__meter" style={progressStyle} aria-hidden="true">
+            <span />
+          </div>
+        </div>
+
+        <div className="ai-learning-result__facts">
+          <div>
+            <span>Window</span>
+            <strong>{formatLearningTime(learning.durationMs)}</strong>
+          </div>
+          <div>
+            <span>Samples</span>
+            <strong>{learning.sampleCount}</strong>
+          </div>
+          <div>
+            <span>Center</span>
+            <strong>{formatLearningValue(learning.baselineValue, unit)}</strong>
+          </div>
+          <div>
+            <span>Range</span>
+            <strong>{rangeValue}</strong>
+          </div>
+          <div>
+            <span>Noise sigma</span>
+            <strong>{formatLearningValue(learning.standardDeviation, unit)}</strong>
+          </div>
+          <div>
+            <span>Tolerance</span>
+            <strong>{toleranceValue}</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function AILearningControlPanel() {
+  const workspace = useMonitoringWorkspaceContext()
+  const {
+    selectedPortNumber,
+    selectedPortDiagnostic,
+    selectedPortDisplayConfig,
+    startPortLearning,
+    resetPortLearning,
+  } = workspace
+  const [durationMs, setDurationMs] = useState(AI_LEARNING_DURATION_OPTIONS[1].value)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  const learning = selectedPortDiagnostic.learning
+
+  useEffect(() => {
+    if (learning.status !== 'learning') {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(intervalId)
+  }, [learning.status])
+
+  const remainingMs =
+    learning.status === 'learning' && learning.targetEndAtMs !== null
+      ? Math.max(0, learning.targetEndAtMs - nowMs)
+      : null
+  const learningProgressPercent =
+    learning.status === 'trained'
+      ? 100
+      : learning.status === 'learning' &&
+          learning.startedAtMs !== null &&
+          learning.targetEndAtMs !== null
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              Math.round(
+                ((nowMs - learning.startedAtMs) /
+                  Math.max(1, learning.targetEndAtMs - learning.startedAtMs)) *
+                  100,
+              ),
+            ),
+          )
+        : 0
+  const learningGraphStyle = {
+    '--learning-progress': `${learningProgressPercent}%`,
+  } as CSSProperties & Record<'--learning-progress', string>
+  const canReset = learning.status === 'trained' || learning.status === 'insufficient_data'
+  const learningStatusText =
+    learning.status === 'learning'
+      ? `Learning ${learningProgressPercent}%`
+      : learning.status === 'trained'
+        ? `Trained from ${learning.sampleCount} samples`
+        : learning.status === 'insufficient_data'
+          ? `Need more samples (${learning.sampleCount})`
+          : 'Not trained'
+
+  return (
+    <section className="ai-learning-panel" aria-label="Port signal learning">
+      <div className="ai-learning-panel__main">
+        <div
+          className={`ai-learning-orbit ai-learning-orbit--${
+            learning.status === 'learning'
+              ? 'active'
+              : learning.status === 'trained'
+                ? 'trained'
+                : 'idle'
+          }`}
+          style={learningGraphStyle}
+          aria-label={`Learning progress ${learningProgressPercent}%`}
+        >
+          <div className="ai-learning-orbit__core">
+            <span>{learning.status === 'learning' ? `${learningProgressPercent}%` : learning.status === 'trained' ? 'OK' : 'AI'}</span>
+          </div>
+        </div>
+
+        <div className="ai-learning-panel__identity">
+          <p className="section-kicker">Signal learning</p>
+          <h3 className="section-title">Port {selectedPortNumber} model</h3>
+        </div>
+
+        <div className="ai-learning-panel__status">
+          <StatusBadge
+            label={learning.status.replace('_', ' ').toUpperCase()}
+            tone={
+              learning.status === 'trained'
+                ? 'normal'
+                : learning.status === 'insufficient_data'
+                  ? 'warning'
+                  : 'neutral'
+            }
+          />
+          <span title={learning.message}>{learningStatusText}</span>
         </div>
       </div>
 
-      <form className="ai-holo-ask" onSubmit={handleAskSubmit}>
-        <input
-          type="text"
-          value={askPrompt}
-          onChange={(event) => setAskPrompt(event.target.value)}
-          placeholder={`Ask about Port ${portNumber} behavior, risk, or next action`}
-          aria-label="Ask the AI about the selected port"
-        />
-        <button
-          type="submit"
-          className="action-button action-button--primary action-button--compact"
-          disabled={isHandlingAsk}
-        >
-          {isHandlingAsk ? 'Working...' : 'Ask'}
-        </button>
-      </form>
+      <div className="ai-learning-panel__metrics">
+        <span>Profile: {selectedPortDisplayConfig.label}</span>
+        <span>Samples: {learning.sampleCount}</span>
+        <span>Remaining: {formatLearningTime(remainingMs)}</span>
+        <label className="ai-learning-panel__time">
+          <span>Learn time</span>
+          <select
+            value={durationMs}
+            disabled={learning.status === 'learning'}
+            onChange={(event) => setDurationMs(Number(event.target.value))}
+          >
+            {AI_LEARNING_DURATION_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
-      <div className="ai-holo-ask__response" aria-live="polite">
-        <span className="ai-holo-ask__response-label">AI guidance</span>
-        <p>
-          {askReply ??
-            `Ask the AI to explain Port ${portNumber}, interpret the current condition, or suggest the next operator action.`}
-        </p>
+      <div className="ai-learning-panel__actions">
+        <button
+          type="button"
+          className="action-button action-button--primary action-button--compact"
+          disabled={learning.status === 'learning'}
+          onClick={() => startPortLearning(selectedPortNumber, durationMs)}
+        >
+          Start Learning
+        </button>
+
+        <button
+          type="button"
+          className="action-button action-button--ghost action-button--compact"
+          disabled={!canReset}
+          onClick={() => resetPortLearning(selectedPortNumber)}
+        >
+          Reset Model
+        </button>
       </div>
     </section>
   )
@@ -479,9 +429,6 @@ function AIDiagnosticsPage() {
     selectedPortDiagnostic,
     selectedPortDisplayConfig,
     selectedPortTrendSeries,
-    trendSeriesByPort,
-    historySnapshot,
-    historyWindowMs,
     setSelectedPortNumber,
   } = workspace
 
@@ -517,7 +464,6 @@ function AIDiagnosticsPage() {
   const systemTrend = getDirectionLabel(
     leadRecord?.diagnostic.forecast.direction ?? 'unknown',
   )
-  const systemConfidence = leadRecord?.diagnostic.confidenceScore ?? 0
   const anomalyItems = useMemo(
     () =>
       insightRecords.map((record) => ({
@@ -533,25 +479,6 @@ function AIDiagnosticsPage() {
     () => selectedPortDiagnostic.probableCauses.slice(0, 3),
     [selectedPortDiagnostic],
   )
-  const portSnapshotsByNumber = useMemo(
-    () =>
-      ports.reduce<Record<number, PortSnapshot>>((accumulator, snapshot) => {
-        accumulator[snapshot.portNumber] = snapshot
-        return accumulator
-      }, {}),
-    [ports],
-  )
-  const latestTimestampByPort = useMemo(
-    () =>
-      Object.entries(trendSeriesByPort).reduce<Record<number, number | null>>(
-        (accumulator, [portKey, series]) => {
-          accumulator[Number(portKey)] = series.latestTimestampMs
-          return accumulator
-        },
-        {},
-      ),
-    [trendSeriesByPort],
-  )
   const evidenceItems = useMemo(
     () => selectedPortDiagnostic.evidence.slice(0, 3),
     [selectedPortDiagnostic],
@@ -566,9 +493,6 @@ function AIDiagnosticsPage() {
       : selectedPortDiagnostic.projectedRiskScore >= 42
         ? 'Priority'
         : 'Routine'
-  const defaultExportRange =
-    getHistoryExportRangeByWindowMs(historySnapshot?.history_window_ms ?? historyWindowMs)
-      ?.value ?? HISTORY_EXPORT_RANGES[0].value
 
   return (
     <div className="workspace-page workspace-page--ai-holo">
@@ -600,12 +524,10 @@ function AIDiagnosticsPage() {
             <strong className="ai-holo-strip__value">{systemTrend}</strong>
           </div>
 
-          <div className="ai-holo-strip__item">
-            <span className="ai-holo-strip__label">Confidence</span>
-            <strong className="ai-holo-strip__value">{systemConfidence}%</strong>
-          </div>
         </section>
       </div>
+
+      <AILearningControlPanel />
 
       <section className="ai-holo-layout">
         <AIAnomalyMap
@@ -622,24 +544,15 @@ function AIDiagnosticsPage() {
             trendSeries={selectedPortTrendSeries}
           />
 
-          <AIAskAnythingPanel
-            key={selectedPortNumber}
+          <AILearningResultPanel
             diagnostic={selectedPortDiagnostic}
-            portNumber={selectedPortNumber}
-            displayLabel={selectedPortDisplayConfig.label}
-            defaultExportRange={defaultExportRange}
-            historyRetentionMs={historySnapshot?.history_retention_ms ?? 0}
-            portSnapshotsByNumber={portSnapshotsByNumber}
-            displayConfigsByPort={resolvedPortDisplayConfigs}
-            diagnosticsByPort={diagnosticsByPort}
-            latestTimestampByPort={latestTimestampByPort}
+            displayConfig={selectedPortDisplayConfig}
           />
 
           <section className="ai-holo-panel ai-holo-panel--analysis">
             <div className="ai-holo-panel__head">
               <div>
                 <p className="section-kicker">Current AI analysis</p>
-                <h3 className="section-title">Diagnosis and reasoning</h3>
               </div>
             </div>
 
@@ -685,46 +598,40 @@ function AIDiagnosticsPage() {
         </section>
 
         <section className="ai-holo-panel ai-holo-panel--future">
-          <div className="ai-holo-panel__head">
+          <div className="ai-holo-future-bar">
             <div>
               <p className="section-kicker">Future prediction</p>
-              <h3 className="section-title">Projected next state</h3>
+              <StatusBadge
+                label={selectedPortDiagnostic.forecast.direction}
+                tone={
+                  selectedPortDiagnostic.forecast.direction === 'rising'
+                    ? 'warning'
+                    : selectedPortDiagnostic.forecast.direction === 'falling'
+                      ? 'normal'
+                      : 'neutral'
+                }
+              />
             </div>
-            <StatusBadge
-              label={selectedPortDiagnostic.forecast.direction}
-              tone={
-                selectedPortDiagnostic.forecast.direction === 'rising'
-                  ? 'warning'
-                  : selectedPortDiagnostic.forecast.direction === 'falling'
-                    ? 'normal'
-                    : 'neutral'
-              }
-            />
-          </div>
 
-          <div className="ai-holo-future__summary">
-            <span className="ai-holo-diagnosis__label">Prediction summary</span>
-            <strong className="ai-holo-diagnosis__value">
-              {selectedPortDiagnostic.forecast.summary}
-            </strong>
-          </div>
+            <div className="ai-holo-future__summary">
+              <strong className="ai-holo-diagnosis__value">
+                {selectedPortDiagnostic.forecast.summary}
+              </strong>
+            </div>
 
-          <div className="ai-holo-future__facts">
-            <div className="ai-holo-future__fact">
-              <span>Escalation risk</span>
-              <strong>{selectedPortDiagnostic.projectedRiskScore}%</strong>
-            </div>
-            <div className="ai-holo-future__fact">
-              <span>Forecast probability</span>
-              <strong>{selectedPortDiagnostic.forecast.worseningProbability}%</strong>
-            </div>
-            <div className="ai-holo-future__fact">
-              <span>Likely next state</span>
-              <strong>{selectedPortDiagnostic.forecast.expectedState}</strong>
-            </div>
-            <div className="ai-holo-future__fact">
-              <span>Confidence</span>
-              <strong>{selectedPortDiagnostic.confidenceScore}%</strong>
+            <div className="ai-holo-future__facts ai-holo-future__facts--compact">
+              <div className="ai-holo-future__fact">
+                <span>Risk</span>
+                <strong>{selectedPortDiagnostic.projectedRiskScore}%</strong>
+              </div>
+              <div className="ai-holo-future__fact">
+                <span>Probability</span>
+                <strong>{selectedPortDiagnostic.forecast.worseningProbability}%</strong>
+              </div>
+              <div className="ai-holo-future__fact">
+                <span>Next</span>
+                <strong>{selectedPortDiagnostic.forecast.expectedState}</strong>
+              </div>
             </div>
           </div>
         </section>

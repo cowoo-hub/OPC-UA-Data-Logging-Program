@@ -9,6 +9,7 @@ venv/
 
 # Env
 .env
+backend/data/*.local.json
 
 # Logs
 *.log

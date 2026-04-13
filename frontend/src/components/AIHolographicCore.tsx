@@ -23,7 +23,6 @@ function AIHolographicCore({
       <div className="ai-holo-panel__head">
         <div>
           <p className="section-kicker">AI core</p>
-          <h3 className="section-title">Holographic reasoning engine</h3>
         </div>
         <StatusBadge label={diagnostic.level} tone={diagnostic.level} />
       </div>
@@ -49,10 +48,6 @@ function AIHolographicCore({
           </strong>
         </div>
 
-        <div className="ai-core-orbit__summary-band">
-          <span className="ai-core-orbit__summary-label">AI summary</span>
-          <p className="ai-core-orbit__summary">{diagnostic.summary}</p>
-        </div>
       </div>
     </section>
   )

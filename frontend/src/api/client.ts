@@ -7,6 +7,8 @@ import type {
   ConnectionStatusResponse,
   ConvertRequest,
   ConvertResponse,
+  DisplaySyncRequest,
+  DisplaySyncResponse,
   FieldMode,
   DisconnectResponse,
   HealthResponse,
@@ -18,6 +20,10 @@ import type {
   IsduReadResponse,
   IsduWriteRequest,
   IsduWriteResponse,
+  OpcUaConfigRequest,
+  OpcUaConfigResponse,
+  OpcUaNodePreviewResponse,
+  OpcUaStatusResponse,
   PortDisplayConfig,
   PortSeverity,
   DiagnosticLevel,
@@ -153,6 +159,32 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
 export async function fetchConnectionStatus(): Promise<ConnectionStatusResponse> {
   return request<ConnectionStatusResponse>('/connection')
+}
+
+export async function fetchOpcUaStatus(): Promise<OpcUaStatusResponse> {
+  return request<OpcUaStatusResponse>('/opcua/status')
+}
+
+export async function fetchOpcUaNodes(): Promise<OpcUaNodePreviewResponse> {
+  return request<OpcUaNodePreviewResponse>('/opcua/nodes')
+}
+
+export async function updateOpcUaConfig(
+  payload: OpcUaConfigRequest,
+): Promise<OpcUaConfigResponse> {
+  return request<OpcUaConfigResponse>('/opcua/config', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function syncDisplayConfigs(
+  payload: DisplaySyncRequest,
+): Promise<DisplaySyncResponse> {
+  return request<DisplaySyncResponse>('/display-configs', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function fetchIoddLibrary(): Promise<IoddLibraryResponse> {

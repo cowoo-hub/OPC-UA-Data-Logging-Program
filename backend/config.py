@@ -134,6 +134,19 @@ def _read_http_scheme_env(name: str, default: str) -> str:
     return default
 
 
+def _read_choice_env(name: str, default: str, allowed: set[str]) -> str:
+    raw_value = os.getenv(name)
+
+    if raw_value is None:
+        return default
+
+    normalized = raw_value.strip().lower()
+    if normalized in allowed:
+        return normalized
+
+    return default
+
+
 @dataclass(slots=True)
 class AppSettings:
     """
@@ -159,6 +172,18 @@ class AppSettings:
     isdu_http_username: str | None = None
     isdu_http_password: str | None = None
     iodd_library_dir: str = str(Path(__file__).resolve().parent / "data" / "iodd_library")
+    opcua_enabled: bool = False
+    opcua_host: str = "0.0.0.0"
+    opcua_port: int = 4840
+    opcua_path: str = "masterway"
+    opcua_namespace_uri: str = "urn:masterway:opcua"
+    opcua_server_name: str = "Masterway OPC UA Server"
+    opcua_security_mode: str = "none"
+    opcua_anonymous: bool = True
+    opcua_writable: bool = False
+    runtime_settings_file: str = str(
+        Path(__file__).resolve().parent / "data" / "runtime_settings.local.json"
+    )
 
     @property
     def backend_mode(self) -> str:
@@ -242,5 +267,18 @@ def load_settings() -> AppSettings:
         iodd_library_dir=(
             _read_optional_str_env("IODD_LIBRARY_DIR")
             or str(Path(__file__).resolve().parent / "data" / "iodd_library")
+        ),
+        opcua_enabled=_read_bool_env("OPCUA_ENABLED", default=False),
+        opcua_host=_read_optional_str_env("OPCUA_HOST") or "0.0.0.0",
+        opcua_port=_read_int_env("OPCUA_PORT", default=4840, minimum=1, maximum=65535),
+        opcua_path=_read_optional_str_env("OPCUA_PATH") or "masterway",
+        opcua_namespace_uri=_read_optional_str_env("OPCUA_NAMESPACE_URI") or "urn:masterway:opcua",
+        opcua_server_name=_read_optional_str_env("OPCUA_SERVER_NAME") or "Masterway OPC UA Server",
+        opcua_security_mode=_read_choice_env("OPCUA_SECURITY_MODE", default="none", allowed={"none"}),
+        opcua_anonymous=_read_bool_env("OPCUA_ANONYMOUS", default=True),
+        opcua_writable=_read_bool_env("OPCUA_WRITABLE", default=False),
+        runtime_settings_file=(
+            _read_optional_str_env("MASTERWAY_RUNTIME_SETTINGS_FILE")
+            or str(Path(__file__).resolve().parent / "data" / "runtime_settings.local.json")
         ),
     )

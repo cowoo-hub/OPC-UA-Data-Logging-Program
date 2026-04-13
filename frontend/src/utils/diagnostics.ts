@@ -1,5 +1,6 @@
 import type {
   AllPortsPdiResponse,
+  AiLearningModel,
   DecodedPreview,
   DiagnosticForecastDirection,
   DiagnosticLevel,
@@ -64,6 +65,7 @@ interface LearnedSignalModel {
   flatlineLikely: boolean
   normalWithinBand: boolean
   dataQualityWeight: number
+  source: 'trained_baseline'
 }
 
 interface SpecialMeasurementState {
@@ -195,7 +197,7 @@ function detectSpecialMeasurementState(
       title: 'Out-of-range condition',
       detail: `Configured mapped text "${mappedLabel}" indicates that the measurement is outside the valid sensing range. Stability analysis is suspended while this condition persists.`,
       summary: 'Out-of-range condition persists instead of a valid engineering measurement.',
-      interpretation: `The port is currently reporting "${mappedLabel}" instead of a valid in-range process value. Stability analysis is suspended until the measurement returns to the valid sensing band.`,
+      interpretation: `The port is currently reporting "${mappedLabel}" instead of a valid in-range process value. Stability analysis is suspended until the measurement returns to the valid sensing range.`,
       suggestedAction:
         'Check sensor standoff, target position, and configured measuring range before using this reading operationally.',
       forecastSummary:
@@ -252,7 +254,7 @@ function detectSpecialMeasurementState(
         'Measurement interpretation remains constrained until a valid signal resumes.',
       probableCauseTitle: 'Invalid measurement state at source',
       probableCauseDetail:
-        'The mapped process text indicates that the device is not publishing a valid measurement, so numeric baseline analysis is intentionally paused.',
+        'The mapped process text indicates that the device is not publishing a valid measurement, so numeric model analysis is intentionally paused.',
       evidenceLabel: 'Measurement validity',
       blocksTrendAnalysis: true,
     }
@@ -278,17 +280,6 @@ function median(values: number[]) {
   }
 
   return sortedValues[middleIndex]
-}
-
-function standardDeviation(values: number[], center: number) {
-  if (values.length <= 1) {
-    return 0
-  }
-
-  const variance =
-    values.reduce((total, value) => total + (value - center) ** 2, 0) / values.length
-
-  return Math.sqrt(Math.max(variance, 0))
 }
 
 function countEndingWhere(values: boolean[]) {
@@ -341,7 +332,7 @@ function buildBandDetail(
   model: LearnedSignalModel,
   displayConfig: PortDisplayConfig,
 ) {
-  return `Learned baseline ${formatNumericValue(model.baselineValue, displayConfig.engineeringUnit)} with a normal band of +/-${formatNumericValue(model.baselineBandHalfWidth, displayConfig.engineeringUnit)}. Latest deviation is ${formatNumericValue(model.latestAbsDeviation, displayConfig.engineeringUnit)}.`
+  return `Learned model ${formatNumericValue(model.baselineValue, displayConfig.engineeringUnit)} with a normal range of +/-${formatNumericValue(model.baselineBandHalfWidth, displayConfig.engineeringUnit)}. Latest deviation is ${formatNumericValue(model.latestAbsDeviation, displayConfig.engineeringUnit)}.`
 }
 
 function getHistorySpanMs(trendSeries: PortTrendSeries) {
@@ -406,38 +397,39 @@ function evaluateRangeLevel(
 function buildLearnedSignalModel(
   trendSeries: PortTrendSeries,
   displayConfig: PortDisplayConfig,
+  learningModel: AiLearningModel | null,
 ): LearnedSignalModel | null {
-  if (trendSeries.points.length < 6 || trendSeries.latestValue === null) {
+  if (
+    learningModel?.status !== 'trained' ||
+    learningModel.baselineValue === null ||
+    learningModel.bandHalfWidth === null ||
+    trendSeries.points.length < 2 ||
+    trendSeries.latestValue === null
+  ) {
     return null
   }
 
   const diagnosticSettings = getPortDiagnosticSettings(displayConfig.profileId)
   const profileSensitivity = clamp(diagnosticSettings.spikeFactor, 0.18, 0.85)
-  const points = trendSeries.points.slice(-Math.min(36, trendSeries.points.length))
+  const points = trendSeries.points.slice(-Math.min(24, trendSeries.points.length))
   const values = points.map((point) => point.value)
   const latestValue = values.at(-1) ?? trendSeries.latestValue
   const tailSize = clamp(Math.round(points.length * 0.32), 4, 8)
-  const baselineSource = values.slice(0, Math.max(values.length - tailSize, 1))
-  const baselinePool = baselineSource.length >= 4 ? baselineSource : values
-  const baselineValue = median(baselinePool)
-  const absoluteDeviations = baselinePool.map((value) => Math.abs(value - baselineValue))
-  const mad = median(absoluteDeviations)
-  const standardDeviationValue = standardDeviation(baselinePool, baselineValue)
+  const baselineValue = learningModel.baselineValue
   const resolutionFloor = Math.max(displayConfig.resolutionFactor, 0.0001)
   const profileFloor = Math.max(diagnosticSettings.flatlineEpsilon ?? 0, resolutionFloor)
   const amplitudeFloor = Math.max(Math.abs(baselineValue) * 0.0012, resolutionFloor * 0.65)
   const learnedNoiseScale = Math.max(
-    mad * 1.4826,
-    standardDeviationValue,
+    learningModel.mad === null ? 0 : learningModel.mad * 1.4826,
+    learningModel.standardDeviation ?? 0,
+    learningModel.bandHalfWidth / 4.2,
     profileFloor,
     amplitudeFloor,
     0.0005,
   )
-  const normalBandMultiplier = 3.8 + profileSensitivity * 1.2
   const recoveryBandMultiplier = 2.75 + profileSensitivity * 0.85
-  const criticalBandMultiplier = 6.9 + profileSensitivity * 1.25
   const baselineBandHalfWidth = Math.max(
-    learnedNoiseScale * normalBandMultiplier,
+    learningModel.bandHalfWidth,
     resolutionFloor * 3.4,
     profileFloor * 2.6,
   )
@@ -447,7 +439,7 @@ function buildLearnedSignalModel(
     profileFloor * 1.75,
   )
   const criticalBandHalfWidth = Math.max(
-    learnedNoiseScale * criticalBandMultiplier,
+    learnedNoiseScale * (6.9 + profileSensitivity * 1.25),
     baselineBandHalfWidth * 2.2,
   )
   const tailValues = values.slice(-tailSize)
@@ -605,6 +597,7 @@ function buildLearnedSignalModel(
       stableRun >= recoveryDwellSamples &&
       outsideBandCount <= Math.max(1, Math.floor(tailSize * 0.2)),
     dataQualityWeight,
+    source: 'trained_baseline',
   }
 }
 
@@ -612,11 +605,20 @@ function buildSummary(
   reasons: PortDiagnosticReason[],
   displayConfig: PortDisplayConfig,
   learnedSignalModel: LearnedSignalModel | null,
+  learningModel: AiLearningModel | null,
   specialMeasurementState: SpecialMeasurementState | null,
 ) {
   if (reasons.length === 0) {
     if (learnedSignalModel) {
-      return `${displayConfig.label} is stable within its learned signal band.`
+      return `${displayConfig.label} is stable within its learned normal model.`
+    }
+
+    if (learningModel?.status === 'learning') {
+      return `${displayConfig.label} signal learning is in progress.`
+    }
+
+    if (learningModel?.status !== 'trained') {
+      return `${displayConfig.label} is awaiting a trained normal model.`
     }
 
     return 'AI analysis sees a stable operating envelope with no material anomaly signals.'
@@ -647,14 +649,14 @@ function buildSummary(
       return `The process value is outside its configured operating envelope.${suffix}`
     case 'drift':
       if (topReason.title === 'Recovery not yet confirmed') {
-        return `The signal is returning toward its learned baseline, but recovery dwell is not complete yet.${suffix}`
+        return `The signal is returning toward its learned model, but recovery dwell is not complete yet.${suffix}`
       }
 
       return topReason.level === 'critical'
-        ? `The signal is sustaining a large deviation from its learned baseline.${suffix}`
-        : `Mild drift is persisting beyond the learned signal band.${suffix}`
+        ? `The signal is sustaining a large deviation from its learned model.${suffix}`
+        : `Mild drift is persisting beyond the learned normal model.${suffix}`
     case 'spike':
-      return `A sudden change exceeded the learned change band for this signal.${suffix}`
+      return `A sudden change exceeded the learned change limit for this signal.${suffix}`
     case 'flatline':
       return `The signal has become unusually static compared with its earlier behavior.${suffix}`
     case 'event_code':
@@ -696,7 +698,7 @@ function buildBaseSuggestedAction(
       }
 
       return topReason.level === 'critical'
-        ? 'Check for process upset, sensor displacement, or configuration drift because the signal has moved well outside its learned band.'
+        ? 'Check for process upset, sensor displacement, or configuration drift because the signal has moved well outside its learned normal model.'
         : 'Watch the process and confirm whether the observed drift matches expected operating change or a developing sensor issue.'
     case 'spike':
       return 'Check for abrupt process disturbance, unstable sensing, or an intermittent connection on the field side.'
@@ -1034,7 +1036,7 @@ function buildForecast(
       : projectedLevel === 'warning'
         ? 'Warning envelope breach is plausible within the short forecast horizon.'
         : learnedSignalModel.settlingBackToBaseline
-          ? 'Recovery toward the learned signal band is underway and risk is currently contained.'
+          ? 'Recovery toward the learned normal model is underway and risk is currently contained.'
         : learnedSignalModel.direction === 'stable'
           ? 'Expected to remain inside the learned operating envelope.'
           : 'Risk looks contained if the present trajectory continues.'
@@ -1044,21 +1046,21 @@ function buildForecast(
   if (learnedSignalModel.direction === 'stable') {
     summary =
       level === 'normal'
-        ? `The learned baseline expects stable behavior over ${horizonLabel}.`
+        ? `The learned model expects stable behavior over ${horizonLabel}.`
         : `Recent evidence is settling, but the current ${level} condition still needs confirmation over ${horizonLabel}.`
   } else if (learnedSignalModel.settlingBackToBaseline) {
-    summary = `Recent deviation is easing back toward the learned baseline over ${horizonLabel}.`
+    summary = `Recent deviation is easing back toward the learned model over ${horizonLabel}.`
   } else if (learnedSignalModel.direction === 'rising') {
     summary =
       projectedLevel === 'critical'
         ? `The learned trend suggests a critical escalation path over ${horizonLabel}.`
         : projectedLevel === 'warning'
           ? `The signal is drifting upward and may deepen its warning posture over ${horizonLabel}.`
-          : `The signal is trending upward, but the model still keeps it inside the expected band over ${horizonLabel}.`
+          : `The signal is trending upward, but the model still keeps it inside the expected range over ${horizonLabel}.`
   } else {
     summary =
       projectedLevel === 'normal'
-        ? `The signal is easing back toward its learned baseline over ${horizonLabel}.`
+        ? `The signal is easing back toward its learned model over ${horizonLabel}.`
         : `The signal is moving lower, but elevated residual risk is still expected over ${horizonLabel}.`
   }
 
@@ -1194,9 +1196,9 @@ function buildProbableCauses(
         break
       case 'drift':
         upsertCause({
-          title: 'Sustained drift from learned baseline',
+          title: 'Sustained drift from learned model',
           detail:
-            'Recent samples are persistently outside the learned signal band, which suggests a real process shift or sensor drift rather than normal fine movement.',
+            'Recent samples are persistently outside the learned normal model, which suggests a real process shift or sensor drift rather than normal fine movement.',
           weight: reason.level === 'critical' ? 78 : 62,
         })
         break
@@ -1204,7 +1206,7 @@ function buildProbableCauses(
         upsertCause({
           title: 'Abrupt process disturbance or unstable sensing',
           detail:
-            'Recent history shows a fast value excursion that is inconsistent with the learned change band for this signal.',
+            'Recent history shows a fast value excursion that is inconsistent with the learned change limit for this signal.',
           weight: reason.level === 'critical' ? 76 : 64,
         })
         break
@@ -1255,27 +1257,18 @@ function buildProbableCauses(
 function buildEvidence(
   snapshot: PortSnapshot,
   displayConfig: PortDisplayConfig,
-  featuredPreview: DecodedPreview,
+  _featuredPreview: DecodedPreview,
   trendSeries: PortTrendSeries,
   dashboard: AllPortsPdiResponse | null,
   reasons: PortDiagnosticReason[],
   signalQuality: PortDiagnosticSignalQuality,
   numericValue: number | null,
   learnedSignalModel: LearnedSignalModel | null,
+  learningModel: AiLearningModel | null,
   specialMeasurementState: SpecialMeasurementState | null,
 ): PortDiagnosticEvidence[] {
   const evidence: PortDiagnosticEvidence[] = []
   const polling = dashboard?.polling ?? null
-
-  if (featuredPreview.displayValue) {
-    evidence.push({
-      label: 'Current decoded reading',
-        detail:
-        featuredPreview.sentinelLabel !== null
-          ? `${displayConfig.label} is currently in the configured mapped state "${featuredPreview.sentinelLabel}".`
-          : `Live engineering value is ${featuredPreview.displayValue}${displayConfig.engineeringUnit ? ` ${displayConfig.engineeringUnit}` : ''}.`,
-    })
-  }
 
   if (specialMeasurementState?.blocksTrendAnalysis) {
     evidence.push({
@@ -1286,17 +1279,22 @@ function buildEvidence(
     evidence.push({
       label: 'Stability analysis status',
       detail:
-        'Normal learned-band stability analysis is currently suspended because the live mapped value does not represent a valid measurement.',
+        'Normal model stability analysis is currently suspended because the live mapped value does not represent a valid measurement.',
     })
   } else if (learnedSignalModel) {
     evidence.push({
-      label: 'Learned baseline',
+      label: 'Learned model',
       detail: buildBandDetail(learnedSignalModel, displayConfig),
     })
 
     evidence.push({
       label: 'Adaptive dwell logic',
-      detail: `Warning dwell ${learnedSignalModel.warningDwellSamples} samples, recovery dwell ${learnedSignalModel.recoveryDwellSamples} samples. Fine movement inside the learned band is treated as normal sensor behavior.`,
+      detail: `Warning dwell ${learnedSignalModel.warningDwellSamples} samples, recovery dwell ${learnedSignalModel.recoveryDwellSamples} samples. Fine movement inside the learned normal model is treated as normal sensor behavior.`,
+    })
+  } else if (learningModel) {
+    evidence.push({
+      label: 'Learning status',
+      detail: learningModel.message,
     })
   }
 
@@ -1365,6 +1363,7 @@ function buildCurrentInterpretation(
   currentRiskScore: number,
   projectedRiskScore: number,
   learnedSignalModel: LearnedSignalModel | null,
+  learningModel: AiLearningModel | null,
   specialMeasurementState: SpecialMeasurementState | null,
 ): string {
   if (specialMeasurementState?.blocksTrendAnalysis) {
@@ -1373,7 +1372,19 @@ function buildCurrentInterpretation(
 
   if (reasons.length === 0) {
     if (learnedSignalModel) {
-      return `${displayConfig.label} is stable within its learned band around ${formatNumericValue(learnedSignalModel.baselineValue, displayConfig.engineeringUnit)}. Normal fine movement is still being treated as stable.`
+      return `${displayConfig.label} is stable within its learned normal model around ${formatNumericValue(learnedSignalModel.baselineValue, displayConfig.engineeringUnit)}. Normal fine movement is still being treated as stable.`
+    }
+
+    if (learningModel?.status === 'learning') {
+      return `${displayConfig.label} is collecting a normal model. Anomaly decisions are held until learning is complete.`
+    }
+
+    if (learningModel?.status === 'insufficient_data') {
+      return `${displayConfig.label} needs another learning run because the last model capture did not collect enough valid samples.`
+    }
+
+    if (learningModel?.status !== 'trained') {
+      return `${displayConfig.label} has no trained normal model yet. Use Start Learning while this port is operating normally.`
     }
 
     return `${displayConfig.label} is behaving inside its expected operating envelope with ${signalQuality.label} signal quality.`
@@ -1390,12 +1401,12 @@ function buildCurrentInterpretation(
   switch (topReason.code) {
     case 'drift':
       if (topReason.title === 'Recovery not yet confirmed') {
-        return `${displayConfig.label} is moving back inside its learned band, but the model is holding a short recovery dwell so the state does not clear too quickly. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend}.`
+        return `${displayConfig.label} is moving back inside its learned normal model, but the model is holding a short recovery dwell so the state does not clear too quickly. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend}.`
       }
 
-      return `${displayConfig.label} is persistently outside its learned band rather than just showing fine resolution noise. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend} with a ${forecast.direction} forecast posture.`
+      return `${displayConfig.label} is persistently outside its learned normal model rather than just showing fine resolution noise. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend} with a ${forecast.direction} forecast posture.`
     case 'spike':
-      return `${displayConfig.label} has produced a step change beyond its learned change band. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend}.`
+      return `${displayConfig.label} has produced a step change beyond its learned change limit. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend}.`
     case 'flatline':
       return `${displayConfig.label} has become unusually static relative to its earlier behavior. Signal quality is ${signalQuality.label}, and short-horizon risk is ${riskTrend}.`
     default:
@@ -1432,6 +1443,7 @@ export function buildPortDiagnostic(
   featuredPreview: DecodedPreview,
   trendSeries: PortTrendSeries,
   dashboard: AllPortsPdiResponse | null,
+  learningModel: AiLearningModel | null,
 ): PortDiagnostic {
   const reasons: PortDiagnosticReason[] = []
   const polling = dashboard?.polling ?? null
@@ -1445,7 +1457,7 @@ export function buildPortDiagnostic(
   const learnedSignalModel =
     specialMeasurementState?.blocksTrendAnalysis
       ? null
-      : buildLearnedSignalModel(trendSeries, displayConfig)
+      : buildLearnedSignalModel(trendSeries, displayConfig, learningModel)
 
   if (polling?.communication_state === 'polling_error') {
     reasons.push(
@@ -1584,7 +1596,7 @@ export function buildPortDiagnostic(
           'spike',
           learnedSignalModel.severeDeviation ? 'critical' : 'warning',
           'Sudden spike beyond expected behavior',
-          `Recent step ${formatTrendDelta(learnedSignalModel.latestDelta)} exceeded the learned change band of ${formatNumericValue(learnedSignalModel.spikeThreshold, displayConfig.engineeringUnit)}.`,
+          `Recent step ${formatTrendDelta(learnedSignalModel.latestDelta)} exceeded the learned change limit of ${formatNumericValue(learnedSignalModel.spikeThreshold, displayConfig.engineeringUnit)}.`,
         ),
       )
     } else if (
@@ -1597,12 +1609,12 @@ export function buildPortDiagnostic(
           'drift',
           learnedSignalModel.severeDeviation ? 'critical' : 'warning',
           learnedSignalModel.severeDeviation
-            ? 'Significant deviation from learned baseline'
+            ? 'Significant deviation from learned model'
             : learnedSignalModel.settlingBackToBaseline
               ? 'Recovery not yet confirmed'
             : 'Mild drift detected',
           learnedSignalModel.settlingBackToBaseline
-            ? `The signal is moving back toward the learned band, but only ${learnedSignalModel.stableRun} of ${learnedSignalModel.recoveryDwellSamples} recovery samples have been observed so far.`
+            ? `The signal is moving back toward the learned normal model, but only ${learnedSignalModel.stableRun} of ${learnedSignalModel.recoveryDwellSamples} recovery samples have been observed so far.`
             : buildBandDetail(learnedSignalModel, displayConfig),
         ),
       )
@@ -1671,6 +1683,7 @@ export function buildPortDiagnostic(
       orderedReasons,
       displayConfig,
       learnedSignalModel,
+      learningModel,
       specialMeasurementState,
     ),
     currentInterpretation: buildCurrentInterpretation(
@@ -1681,6 +1694,7 @@ export function buildPortDiagnostic(
       currentRiskScore,
       projectedRiskScore,
       learnedSignalModel,
+      learningModel,
       specialMeasurementState,
     ),
     suggestedAction: buildSuggestedAction(
@@ -1705,10 +1719,28 @@ export function buildPortDiagnostic(
       signalQuality,
       numericValue,
       learnedSignalModel,
+      learningModel,
       specialMeasurementState,
     ),
     forecast,
     signalQuality,
+    learning: learningModel ?? {
+      status: 'not_started',
+      startedAtMs: null,
+      targetEndAtMs: null,
+      completedAtMs: null,
+      durationMs: 30000,
+      sampleCount: 0,
+      baselineValue: null,
+      minimumValue: null,
+      maximumValue: null,
+      standardDeviation: null,
+      mad: null,
+      bandHalfWidth: null,
+      label: '',
+      unit: '',
+      message: 'No learned model yet. Use Start Learning while the sensor is in a normal condition.',
+    },
     liveValue: featuredPreview.error ? null : featuredPreview.displayValue,
     liveNumericValue: specialMeasurementState?.blocksTrendAnalysis ? null : numericValue,
     trendStatus: trendSeries.status,

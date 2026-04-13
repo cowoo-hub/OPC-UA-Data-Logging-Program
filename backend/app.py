@@ -5,6 +5,7 @@ import importlib.util
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Literal
@@ -45,7 +46,10 @@ from modbus_core import (
     parse_pdi_header,
     validate_port,
 )
+from opcua_service import OPCUAService
+from pdi_display import DisplaySyncStore, build_display_state_payload, derive_port_severity
 from polling import PDICacheWorker
+from runtime_settings import RuntimeSettingsStore
 from simulator import ICE2Simulator
 
 logger = logging.getLogger("ice2.backend.app")
@@ -202,6 +206,27 @@ class ISDUWriteRequest(BaseModel):
     )
 
 
+class DisplaySyncPortRequest(BaseModel):
+    config: dict[str, object]
+    processDataProfile: dict[str, object] | None = None
+
+
+class DisplaySyncRequest(BaseModel):
+    ports: dict[str, DisplaySyncPortRequest]
+
+
+class OPCUAConfigRequest(BaseModel):
+    enabled: bool = Field(False)
+    host: str = Field("0.0.0.0")
+    port: int = Field(4840, ge=1, le=65535)
+    path: str = Field("masterway", min_length=1)
+    namespace_uri: str = Field("urn:masterway:opcua", min_length=1)
+    server_name: str = Field("Masterway OPC UA Server", min_length=1)
+    security_mode: Literal["none"] = Field("none")
+    anonymous: bool = Field(True)
+    writable: bool = Field(False)
+
+
 def _create_backend(connection: ModbusConnectionConfig) -> ICE2Backend:
     """
     Create the active ICE2 backend.
@@ -297,7 +322,226 @@ def _create_polling_worker(settings: AppSettings) -> PDICacheWorker:
         history_sample_interval_ms=settings.history_sample_interval_ms,
         payload_word_count=settings.payload_word_count,
         block_mode=settings.block_mode,
+        event_callback=_handle_polling_event,
     )
+
+
+def _create_opcua_service(settings: AppSettings) -> OPCUAService:
+    return OPCUAService(
+        enabled=settings.opcua_enabled,
+        host=settings.opcua_host,
+        port=settings.opcua_port,
+        path=settings.opcua_path,
+        namespace_uri=settings.opcua_namespace_uri,
+        server_name=settings.opcua_server_name,
+        security_mode=settings.opcua_security_mode,
+        anonymous=settings.opcua_anonymous,
+        writable=settings.opcua_writable,
+    )
+
+
+def _get_opcua_service() -> OPCUAService | None:
+    return getattr(app.state, "opcua_service", None)
+
+
+def _coerce_bool(value: object, fallback: bool) -> bool:
+    return value if isinstance(value, bool) else fallback
+
+
+def _coerce_int(value: object, fallback: int, *, minimum: int, maximum: int) -> int:
+    if not isinstance(value, int):
+        return fallback
+    return min(maximum, max(minimum, value))
+
+
+def _coerce_optional_str(value: object, fallback: str | None = None) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return fallback
+    trimmed = value.strip()
+    return trimmed or None
+
+
+def _coerce_str(value: object, fallback: str) -> str:
+    if not isinstance(value, str):
+        return fallback
+    trimmed = value.strip()
+    return trimmed or fallback
+
+
+def _apply_runtime_settings(settings: AppSettings, store: RuntimeSettingsStore) -> None:
+    """Apply UI-saved integration settings after environment defaults load."""
+    persisted = store.load()
+
+    opcua = persisted.get("opcua")
+    if isinstance(opcua, dict):
+        settings.opcua_enabled = _coerce_bool(opcua.get("enabled"), settings.opcua_enabled)
+        settings.opcua_host = _coerce_str(opcua.get("host"), settings.opcua_host)
+        settings.opcua_port = _coerce_int(
+            opcua.get("port"),
+            settings.opcua_port,
+            minimum=1,
+            maximum=65535,
+        )
+        settings.opcua_path = _coerce_str(opcua.get("path"), settings.opcua_path).strip("/")
+        settings.opcua_namespace_uri = _coerce_str(
+            opcua.get("namespace_uri"),
+            settings.opcua_namespace_uri,
+        )
+        settings.opcua_server_name = _coerce_str(opcua.get("server_name"), settings.opcua_server_name)
+        security_mode = _coerce_str(opcua.get("security_mode"), settings.opcua_security_mode)
+        settings.opcua_security_mode = "none" if security_mode != "none" else security_mode
+        settings.opcua_anonymous = _coerce_bool(opcua.get("anonymous"), settings.opcua_anonymous)
+        settings.opcua_writable = _coerce_bool(opcua.get("writable"), settings.opcua_writable)
+
+
+def _get_runtime_settings_store() -> RuntimeSettingsStore | None:
+    return getattr(app.state, "runtime_settings_store", None)
+
+
+def _get_runtime_settings_status() -> dict[str, object] | None:
+    store = _get_runtime_settings_store()
+    return store.get_status() if store is not None else None
+
+
+def _persist_runtime_section_or_raise(section: str, values: dict[str, object]) -> dict[str, object]:
+    store = _get_runtime_settings_store()
+    if store is None:
+        raise HTTPException(status_code=500, detail="Runtime settings store is unavailable.")
+
+    try:
+        store.update_section(section, values)
+    except OSError as exc:
+        logger.exception("Failed to persist %s runtime settings", section)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to persist {section} settings: {exc}",
+        ) from exc
+
+    return store.get_status()
+
+
+def _get_display_sync_store() -> DisplaySyncStore:
+    return app.state.display_sync_store
+
+
+def _build_integration_health_payload(*, polling: object | None = None) -> dict[str, object]:
+    settings = _get_settings()
+    polling_status = polling if polling is not None else app.state.polling_worker.get_status()
+    opcua_service = _get_opcua_service()
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "ok",
+        "service": "masterway-backend",
+        "backendMode": _get_runtime_mode(),
+        "defaultMode": settings.default_mode,
+        "polling": polling_status.to_dict() if hasattr(polling_status, "to_dict") else polling_status,
+        "opcua": opcua_service.get_status().to_dict() if opcua_service is not None else None,
+        "settingsPersistence": _get_runtime_settings_status(),
+        "displaySync": {
+            "updatedAt": _get_display_sync_store().get_updated_at(),
+        },
+    }
+
+
+def _build_connection_payload(*, connection: ModbusConnectionConfig | None = None) -> dict[str, object]:
+    active_connection = app.state.connection_config if connection is None else connection
+    polling_status = app.state.polling_worker.get_status()
+    return {
+        "configured": active_connection is not None,
+        "connection": None if active_connection is None else active_connection.to_dict(),
+        "polling": polling_status.to_dict(),
+    }
+
+
+def _build_port_integration_payload(
+    *,
+    connection: dict[str, object],
+    snapshot: dict[str, object],
+    cycle_count: int,
+) -> dict[str, object]:
+    header = snapshot.get("header")
+    payload = snapshot.get("payload")
+    pdi_block = snapshot.get("pdi_block")
+    port_number = snapshot.get("port")
+    port_sync_state = (
+        _get_display_sync_store().get_state(port_number)
+        if isinstance(port_number, int)
+        else None
+    )
+    display_state = (
+        build_display_state_payload(
+            snapshot=snapshot,
+            config=port_sync_state.config,
+            process_data_profile=port_sync_state.process_data_profile,
+        )
+        if port_sync_state is not None
+        else None
+    )
+
+    return {
+        "timestamp": snapshot.get("capturedAt") or datetime.now(timezone.utc).isoformat(),
+        "source": "modbus-tcp",
+        "cycleCount": cycle_count,
+        "connection": connection,
+        "port": port_number,
+        "severity": display_state["severity"] if isinstance(display_state, dict) else derive_port_severity(snapshot),
+        "header": header,
+        "pdiBlock": pdi_block,
+        "payload": payload,
+        "display": display_state,
+        "valid": bool(
+            isinstance(header, dict)
+            and isinstance(header.get("port_status"), dict)
+            and header["port_status"].get("pdi_valid")
+        ),
+    }
+
+
+def _handle_polling_event(event: dict[str, object]) -> None:
+    opcua_service = _get_opcua_service()
+
+    event_type = event.get("type")
+    if event_type == "poll_success":
+        connection = event.get("connection")
+        ports = event.get("ports")
+        cycle_count = int(event.get("cycle_count", 0))
+        if not isinstance(connection, dict) or not isinstance(ports, dict):
+            return
+
+        for port_number, snapshot in ports.items():
+            if not isinstance(port_number, int) or not isinstance(snapshot, dict):
+                continue
+
+            port_payload = _build_port_integration_payload(
+                connection=connection,
+                snapshot=snapshot,
+                cycle_count=cycle_count,
+            )
+            if opcua_service is not None and opcua_service.enabled:
+                opcua_service.update_port_snapshot(port_number, port_payload)
+
+        health_payload = _build_integration_health_payload()
+        if opcua_service is not None and opcua_service.enabled:
+            opcua_service.update_system(health_payload)
+        return
+
+    if event_type == "poll_error":
+        error_payload = {
+            **_build_integration_health_payload(),
+            "status": "error",
+            "pollError": {
+                "phase": event.get("phase"),
+                "error": event.get("error"),
+                "retryInMs": event.get("retry_in_ms"),
+                "attempt": event.get("attempt"),
+                "connection": event.get("connection"),
+            },
+        }
+        if opcua_service is not None and opcua_service.enabled:
+            opcua_service.update_system(error_payload)
 
 
 def _ensure_runtime_state(*, start_worker: bool) -> AppSettings:
@@ -305,9 +549,11 @@ def _ensure_runtime_state(*, start_worker: bool) -> AppSettings:
 
     if settings is None:
         settings = load_settings()
+        app.state.runtime_settings_store = RuntimeSettingsStore(Path(settings.runtime_settings_file))
+        _apply_runtime_settings(settings, app.state.runtime_settings_store)
         _log_runtime_dependency_status()
         logger.info(
-            "Backend startup configuration: default_mode=%s poll_interval_ms=%s stale_after_ms=%s history_retention_ms=%s block_mode=%s payload_word_count=%s iodd_library_dir=%s",
+            "Backend startup configuration: default_mode=%s poll_interval_ms=%s stale_after_ms=%s history_retention_ms=%s block_mode=%s payload_word_count=%s iodd_library_dir=%s runtime_settings_file=%s",
             settings.default_mode,
             settings.poll_interval_ms,
             settings.stale_after_ms,
@@ -315,8 +561,11 @@ def _ensure_runtime_state(*, start_worker: bool) -> AppSettings:
             settings.block_mode,
             settings.payload_word_count,
             settings.iodd_library_dir,
+            settings.runtime_settings_file,
         )
         app.state.settings = settings
+    elif not hasattr(app.state, "runtime_settings_store"):
+        app.state.runtime_settings_store = RuntimeSettingsStore(Path(settings.runtime_settings_file))
 
     if not hasattr(app.state, "connection_config"):
         app.state.connection_config = None
@@ -324,10 +573,19 @@ def _ensure_runtime_state(*, start_worker: bool) -> AppSettings:
     if not hasattr(app.state, "iodd_library"):
         app.state.iodd_library = IODDLibraryService(Path(settings.iodd_library_dir))
 
+    if not hasattr(app.state, "display_sync_store"):
+        app.state.display_sync_store = DisplaySyncStore()
+
+    if not hasattr(app.state, "opcua_service"):
+        app.state.opcua_service = _create_opcua_service(settings)
+
     worker = getattr(app.state, "polling_worker", None)
     if worker is None:
         worker = _create_polling_worker(settings)
         app.state.polling_worker = worker
+
+    if start_worker:
+        app.state.opcua_service.start()
 
     if start_worker:
         try:
@@ -351,6 +609,9 @@ async def lifespan(app: FastAPI):
         polling_worker = getattr(app.state, "polling_worker", None)
         if polling_worker is not None:
             polling_worker.stop()
+        opcua_service = getattr(app.state, "opcua_service", None)
+        if opcua_service is not None:
+            opcua_service.stop()
 
 
 app = FastAPI(
@@ -458,6 +719,7 @@ def root() -> dict[str, object]:
         "default_mode": settings.default_mode,
         "use_simulator": settings.use_simulator,
         "polling": polling.to_dict(),
+        "opcua": _get_opcua_service().get_status().to_dict() if _get_opcua_service() else None,
         "docs": "/docs",
         "features_ready_now": [
             "Background PDI polling cache",
@@ -469,7 +731,6 @@ def root() -> dict[str, object]:
             "Header parsing and value conversion",
         ],
         "future_ready_for": [
-            "MQTT publishing",
             "AI diagnostics",
             "Industrial UI",
         ],
@@ -483,6 +744,7 @@ def health() -> dict[str, object]:
     polling = app.state.polling_worker.get_status()
     dependency_report = _build_dependency_report()
     multipart_available = _is_multipart_available()
+    opcua_service = _get_opcua_service()
 
     return {
         "status": "ok",
@@ -504,6 +766,8 @@ def health() -> dict[str, object]:
         "frontend_dist_dir": str(_get_frontend_dist_dir()) if _get_frontend_dist_dir() else None,
         "frontend_assets_available": _get_frontend_dist_dir() is not None,
         "iodd_upload_enabled": multipart_available,
+        "opcua": opcua_service.get_status().to_dict() if opcua_service is not None else None,
+        "display_sync_updated_at": _get_display_sync_store().get_updated_at(),
         "dependencies": dependency_report,
         "cache_running": polling.running,
         "cache_updated_at": polling.updated_at,
@@ -646,6 +910,115 @@ def get_connection() -> dict[str, object]:
     }
 
 
+@app.get("/opcua/status")
+def get_opcua_status() -> dict[str, object]:
+    """Return the current read-only OPC UA server status."""
+    opcua_service = _get_opcua_service()
+    polling = app.state.polling_worker.get_status()
+    return {
+        "opcua": opcua_service.get_status().to_dict() if opcua_service is not None else None,
+        "connection": _build_connection_payload(),
+        "polling": polling.to_dict(),
+        "settingsPersistence": _get_runtime_settings_status(),
+    }
+
+
+@app.get("/opcua/nodes")
+def get_opcua_nodes() -> dict[str, object]:
+    """Return a live preview of OPC UA variable nodes exposed by Masterway."""
+    opcua_service = _get_opcua_service()
+    polling = app.state.polling_worker.get_status()
+    node_preview = opcua_service.get_node_preview() if opcua_service is not None else {
+        "count": 0,
+        "nodes": [],
+    }
+
+    return {
+        "opcua": opcua_service.get_status().to_dict() if opcua_service is not None else None,
+        "polling": polling.to_dict(),
+        **node_preview,
+    }
+
+
+@app.put("/opcua/config")
+def update_opcua_config(request: OPCUAConfigRequest) -> dict[str, object]:
+    """Update the live OPC UA server settings from the UI."""
+    opcua_service = _get_opcua_service()
+    settings = _get_settings()
+    if opcua_service is None:
+        raise HTTPException(status_code=500, detail="OPC UA service is unavailable.")
+
+    opcua_service.reconfigure(
+        enabled=request.enabled,
+        host=request.host,
+        port=request.port,
+        path=request.path,
+        namespace_uri=request.namespace_uri,
+        server_name=request.server_name,
+        security_mode=request.security_mode,
+        anonymous=request.anonymous,
+        writable=request.writable,
+    )
+
+    settings.opcua_enabled = request.enabled
+    settings.opcua_host = request.host
+    settings.opcua_port = request.port
+    settings.opcua_path = request.path
+    settings.opcua_namespace_uri = request.namespace_uri
+    settings.opcua_server_name = request.server_name
+    settings.opcua_security_mode = request.security_mode
+    settings.opcua_anonymous = request.anonymous
+    settings.opcua_writable = request.writable
+    persistence = _persist_runtime_section_or_raise(
+        "opcua",
+        {
+            "enabled": settings.opcua_enabled,
+            "host": settings.opcua_host,
+            "port": settings.opcua_port,
+            "path": settings.opcua_path,
+            "namespace_uri": settings.opcua_namespace_uri,
+            "server_name": settings.opcua_server_name,
+            "security_mode": settings.opcua_security_mode,
+            "anonymous": settings.opcua_anonymous,
+            "writable": settings.opcua_writable,
+        },
+    )
+
+    return {
+        "updated": True,
+        "opcua": opcua_service.get_status().to_dict(),
+        "settingsPersistence": persistence,
+    }
+
+
+@app.get("/display-configs")
+def get_display_configs() -> dict[str, object]:
+    """Return the currently synced PDI display configuration state used for integration mirroring."""
+    store = _get_display_sync_store()
+    return {
+        "count": len(store.get_all()),
+        "updatedAt": store.get_updated_at(),
+        "ports": store.get_all(),
+    }
+
+
+@app.put("/display-configs")
+def sync_display_configs(request: DisplaySyncRequest) -> dict[str, object]:
+    """Receive the UI's resolved per-port display configuration so integrations can mirror it."""
+    store = _get_display_sync_store()
+    synced_at = store.update(
+        {
+            int(port_number): payload.model_dump()
+            for port_number, payload in request.ports.items()
+        }
+    )
+    return {
+        "updated": True,
+        "count": len(store.get_all()),
+        "updatedAt": synced_at,
+    }
+
+
 @app.post("/connect")
 def connect_to_ice2(request: ConnectRequest) -> dict[str, object]:
     """
@@ -703,7 +1076,6 @@ def connect_to_ice2(request: ConnectRequest) -> dict[str, object]:
         polling_status.has_snapshot,
         polling_status.next_retry_at,
     )
-
     return {
         "connected": True,
         "message": (

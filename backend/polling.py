@@ -27,6 +27,7 @@ PortSnapshotBuilder = Callable[
     dict[str, object],
 ]
 BackendFactory = Callable[[ModbusConnectionConfig], ICE2Backend]
+PollingEventCallback = Callable[[dict[str, object]], None]
 
 logger = logging.getLogger("ice2.backend.polling")
 
@@ -109,6 +110,7 @@ class PDICacheWorker:
         history_sample_interval_ms: int = 100,
         payload_word_count: int = DEFAULT_PAYLOAD_WORD_COUNT,
         block_mode: PDIBlockMode = "multiple",
+        event_callback: PollingEventCallback | None = None,
     ) -> None:
         self._backend_factory = backend_factory
         self._snapshot_builder = snapshot_builder
@@ -122,6 +124,7 @@ class PDICacheWorker:
         self._history_sample_interval_ms = history_sample_interval_ms
         self._payload_word_count = payload_word_count
         self._block_mode = block_mode
+        self._event_callback = event_callback
 
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -485,6 +488,16 @@ class PDICacheWorker:
                 len(port_snapshots),
             )
 
+        self._emit_event(
+            {
+                "type": "poll_success",
+                "connection": connection.to_dict(),
+                "cycle_count": cycle_count,
+                "sampled_history": should_sample_history,
+                "ports": deepcopy(port_snapshots),
+            }
+        )
+
     def _set_error(
         self,
         connection: ModbusConnectionConfig,
@@ -520,6 +533,16 @@ class PDICacheWorker:
             reconnect_attempt,
             delay_ms,
             error,
+        )
+        self._emit_event(
+            {
+                "type": "poll_error",
+                "phase": phase,
+                "connection": connection.to_dict(),
+                "error": str(error),
+                "retry_in_ms": delay_ms,
+                "attempt": reconnect_attempt,
+            }
         )
 
     def _calculate_reconnect_delay_ms(self, mode: BackendMode) -> int:
@@ -759,6 +782,15 @@ class PDICacheWorker:
         remaining = max(0.0, next_retry_monotonic - time.monotonic())
         self._wake_event.wait(timeout=remaining)
         self._wake_event.clear()
+
+    def _emit_event(self, event: dict[str, object]) -> None:
+        if self._event_callback is None:
+            return
+
+        try:
+            self._event_callback(event)
+        except Exception:
+            logger.exception("Polling event callback failed for event_type=%s", event.get("type"))
 
     def _run(self) -> None:
         active_connection: ModbusConnectionConfig | None = None
