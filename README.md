@@ -1,253 +1,356 @@
-# Masterway
+# Masterway OPC UA Data Logging Program
 
-Masterway is a Windows-focused industrial IO-Link monitoring and configuration platform for real-time process-data inspection, device diagnostics, IODD-based decoding, ISDU access, and OPC UA data exposure.
+Masterway OPC UA Data Logging Program is a Windows desktop application for connecting to live OPC UA endpoints, discovering industrial data nodes, and logging selected values into Microsoft Excel and CSV at the same time.
 
-The project is designed as a professional operator tool rather than a prototype dashboard. Its architecture separates the industrial communication layer, cached runtime data model, frontend visualization, AI-assisted diagnostics, and Windows desktop packaging so the product can evolve safely toward a deployable EXE application.
+The program is designed for practical engineering work rather than demo-only visualization. It gives operators and test engineers a compact desktop workspace where they can:
+
+- connect directly to an OPC UA server by host/IP, port, optional path, or full manual endpoint override
+- discover live IO-Link style `PDI Fields` and other OPC UA nodes from the target server
+- mirror current values into a structured Excel workbook for operator visibility
+- keep durable CSV history in parallel with the Excel session
+- stage only the fields that matter for retained history instead of logging every discovered node
+- split output into global sheets and per-port sheets for cleaner analysis
+- prune active history after a retention window while continuously appending trimmed rows into archive CSV files
+- keep logging stable even when Excel becomes busy or slow
+
+This repository is the focused Windows deliverable for the OPC UA logging workflow. It is intended for commissioning, field validation, test benches, factory acceptance support, and industrial data capture on engineering PCs.
 
 ## Product Scope
 
-Masterway is intended for engineers, operators, and system integrators who need a compact and reliable interface for IO-Link master monitoring.
+The application is built around a simple but production-oriented model:
 
-Core goals:
+- OPC UA server is the live data source
+- Masterway desktop viewer is the operator workspace and logging controller
+- Excel workbook is the readable live surface for operators and engineers
+- CSV output is the durable data log
+- retention archive CSV files provide rolling long-term preservation without making the active workbook too large
 
-- Monitor all IO-Link ports with stable, low-latency PDI updates.
-- Decode raw Modbus TCP process data into usable engineering values.
-- Support per-port process-data mapping for different connected devices.
-- Manage uploaded IODD files and use them as device profile references.
-- Read and write ISDU parameters where the target IO-Link master supports it.
-- Provide device, port, and diagnostic status in a professional industrial UI.
-- Expose selected live data to external industrial systems through OPC UA.
-- Package the system as a Windows desktop product named Masterway.
-
-## Current Capabilities
-
-- FastAPI backend for communication, caching, configuration, and integration APIs.
-- React frontend for operator-facing monitoring and configuration screens.
-- Real-device mode for Modbus TCP communication with an IO-Link master.
-- Simulator mode for development, demonstrations, and validation without hardware.
-- PDI Monitor for live raw and decoded process-data inspection.
-- Port Overview for compact per-port configuration and display mapping.
-- IODD Library upload, profile listing, profile inspection, and deletion.
-- ISDU read/write workflow for IO-Link parameter access.
-- AI Diagnostics page with per-port baseline learning and anomaly interpretation.
-- OPC UA server mode for exposing Masterway runtime data as read-only industrial nodes.
-- Desktop launcher and PyInstaller packaging pipeline for Windows EXE deployment.
-
-## Architecture
-
-Masterway uses a layered architecture to keep communication, data processing, UI, and packaging concerns independent.
+The current product is especially well suited to OPC UA servers that expose IO-Link process data in browse paths similar to:
 
 ```text
-IO-Link Master / Simulator
-        |
-        | Modbus TCP / HTTP ISDU
-        v
-Backend Runtime
-  - FastAPI application
-  - Modbus TCP client
-  - PDI polling worker
-  - Runtime cache
-  - IODD library service
-  - ISDU service
-  - OPC UA server bridge
-        |
-        | REST API
-        v
-Frontend Application
-  - PDI Monitor
-  - Port Overview
-  - IODD Library
-  - ISDU Tools
-  - AI Diagnostics
-  - OPC UA Control
-        |
-        v
-Windows Desktop Shell
-  - Local backend process
-  - Embedded web UI
-  - Masterway.exe packaging
+IOLM/Port 7/Attached Device/PDI Fields/MV - Distance
+IOLM/Port 7/Attached Device/PDI Fields/SSC1 - Switching Signal 1
+IOLM/Port 8/Attached Device/PDI Fields/MV - Measurement Value
 ```
 
-This structure is intentional: the backend owns industrial communication and state consistency, while the frontend focuses on visualization, operator interaction, and configuration workflows.
+Node naming depends on the upstream OPC UA server implementation, but the viewer is optimized for PDI-oriented industrial structures.
 
-## Repository Layout
+## What The Program Does
+
+### Direct OPC UA Connection
+
+The viewer supports a staged connection workflow with:
+
+- host/IP input
+- port input
+- optional path input
+- optional full endpoint override
+- connect and disconnect controls
+- start logging only after node discovery and history setup
+
+Typical endpoints:
 
 ```text
-backend/
-  app.py                  FastAPI entry point and API routes
-  config.py               Runtime configuration and environment handling
-  modbus_core.py          Modbus TCP connection and PDI addressing logic
-  polling.py              Cached polling worker for live PDI data
-  pdi_display.py          Display-state normalization and port severity helpers
-  iodd_library.py         IODD upload, indexing, parsing, and deletion support
-  isdu_service.py         ISDU read/write service
-  opcua_service.py        OPC UA server and live node model
-  runtime_settings.py     Persistent runtime settings store
-  simulator.py            Development simulator backend
-
-frontend/
-  src/App.tsx             Main frontend shell and route composition
-  src/pages/              Product pages
-  src/components/         Shared UI components
-  src/hooks/              Workspace and runtime state hooks
-  src/utils/              Diagnostics, learning, and mapping utilities
-  src/styles/app.css      Masterway visual system and layout styles
-
-desktop/
-  launcher.py             Windows desktop launcher
-  masterway.spec          PyInstaller build specification
-  build_windows.ps1       Windows EXE build script
-  assets/                 Desktop assets and icon resources
+opc.tcp://192.168.1.108:4840
+opc.tcp://192.168.1.108:4840/masterway
 ```
 
-## Backend Runtime
+UaExpert can be used to inspect the endpoint in advance, but it does not need to remain open during normal operation. The program connects directly to the OPC UA server.
 
-The backend is the source of truth for industrial communication and runtime state.
+### Live Node Discovery
 
-Main responsibilities:
+After connection, the program reads the target namespace, discovers candidate nodes, and builds a runtime model used for:
 
-- Maintain the selected backend mode: real device or simulator.
-- Connect to the IO-Link master through Modbus TCP.
-- Poll all configured PDI blocks at a controlled interval.
-- Keep the latest per-port snapshots in memory for responsive UI updates.
-- Retain short-term history for trend visualization and CSV export.
-- Normalize decoded display data for the frontend and OPC UA integration.
-- Provide IODD library management.
-- Provide ISDU access where supported by the device and master.
-- Start, stop, and configure the OPC UA server.
+- the global `Live` sheet
+- per-port live sheets such as `Port 1`, `Port 6`, or `Port 8`
+- history staging lists in the UI
+- per-port history sheets
 
-Important API groups:
+### Selective History Logging
 
-- `GET /health`
-- `GET /connection`
-- `POST /connect`
-- `POST /disconnect`
-- `GET /ports/all/pdi`
-- `GET /ports/all/history`
-- `GET /ports/{port}/pdi`
-- `GET /ports/{port}/history`
-- `GET /ports/{port}/history/export`
-- `POST /convert`
-- `GET /iodd/library`
-- `POST /iodd/library/upload`
-- `DELETE /iodd/library/{profile_id}`
-- `POST /isdu/read`
-- `POST /isdu/write`
-- `GET /opcua/status`
-- `GET /opcua/nodes`
-- `PUT /opcua/config`
-- `GET /display-configs`
-- `PUT /display-configs`
+Live monitoring often exposes more nodes than the engineer wants to retain. The viewer therefore separates:
 
-## Frontend Runtime
+- live node discovery
+- selected history fields
 
-The frontend is designed as a dense industrial operator UI. It prioritizes compact layout, stable positioning, and fast visual interpretation over decorative dashboard behavior.
+Only fields explicitly staged into the history selection are written into retained history outputs. This keeps workbook history, per-port history, and CSV logging aligned to the signals that actually matter.
 
-Main pages:
+### Excel Workbook Logging
 
-- PDI Monitor: live PDI inspection with raw and decoded values.
-- Port Overview: per-port profile, decode, scale, status, and map configuration.
-- IODD Library: uploaded profile management and delete workflow.
-- ISDU: parameter read/write tooling for supported IO-Link devices.
-- AI Diagnostics: baseline learning, anomaly scoring, and operator guidance.
-- OPC UA: server configuration, endpoint status, and live node preview.
+The program keeps a live workbook open through the Windows Excel COM bridge. The workbook is intended for human-readable operator use, not just raw data dumping.
 
-UI principles:
+Typical workbook structure:
 
-- Avoid layout shift during live status changes.
-- Keep per-port cards compact and consistent.
-- Prevent chart and text overflow across card boundaries.
-- Use fixed operator-oriented surfaces instead of reactive dashboard motion.
-- Keep key industrial values visible without excessive whitespace.
-- Preserve readability under frequent live data refresh.
+- `Live`
+- `History`
+- `Port 1`
+- `Port 1 History`
+- `Port 6`
+- `Port 6 History`
+- `Port 8`
+- `Port 8 History`
 
-## PDI and Port Data Model
+The exact per-port sheets depend on the selected history fields and discovered nodes for the current session.
 
-Masterway treats each IO-Link port as an independent runtime unit.
+### Persistent CSV Logging
 
-Each port can expose:
+CSV runs in parallel with Excel so that durable history remains available even if Excel is hidden, slow, or restarted. The CSV layer is the primary persistent history record.
 
-- Raw process-data registers.
-- Decoded display value.
-- Scaled engineering value.
-- Process-data validity.
-- Port status and diagnostic indicators.
-- Device-specific profile and mapping selection.
-- Short-term history samples.
-- AI learning and anomaly state.
-- OPC UA mirror nodes.
+The current CSV schema is:
 
-This model allows different sensors on different ports to be monitored with independent scaling, decoding, and diagnostic behavior.
+- `timestamp_kst`
+- `browse_path`
+- `display_name`
+- `value`
+- `datatype`
+- `status`
 
-## AI Diagnostics
+CSV timestamps are normalized to Korea Standard Time and written in the format:
 
-The AI Diagnostics page is designed around per-port learning rather than a single global threshold.
+```text
+YYYY-MM-DD HH:MM:SS
+```
 
-Each port can learn its own expected signal behavior because industrial sensors differ by range, unit, noise profile, application, and operating condition.
+Example:
 
-The current diagnostic model supports:
+```text
+2026-04-17 11:30:33
+```
 
-- Per-port baseline learning.
-- Configurable learning duration.
-- Sample counting during learning.
-- Learned normal envelope.
-- Post-learning anomaly interpretation.
-- Stable AI score layout without text wrapping.
-- Compact current-analysis result cards.
-- Operator-oriented recommendations.
+### Retention With Continuous Archive Export
 
-This approach is more suitable for real industrial monitoring than applying one fixed anomaly rule to every device.
+The active workbook and main CSV can be bounded by a retention window such as:
 
-## OPC UA Integration
+- 30 sec
+- 1 min
+- 5 min
+- 15 min
+- 30 min
+- 1 hour
+- 6 hours
+- or no auto-delete
 
-Masterway includes an OPC UA server mode so external systems can consume live Masterway data.
+When retention is enabled:
 
-Typical consumers:
+- active workbook history is trimmed
+- active CSV history is trimmed
+- trimmed rows are continuously appended to a session archive CSV file
+- archive logging continues until disconnect
 
-- SCADA systems
-- HMI platforms
-- MES systems
-- Historians
-- Test benches
-- Engineering tools such as UaExpert
+This means the operator sees a compact active workbook while older rows remain preserved outside the active retention window.
 
-Default behavior:
+## Technical Architecture
 
-- Endpoint path: `opc.tcp://<host>:4840/masterway`
-- Default host: `0.0.0.0`
-- Default port: `4840`
-- Security mode: none
-- Anonymous access: enabled
-- Node access: read-only by default
+The program has three main runtime layers.
 
-The OPC UA implementation exposes a live node preview in the UI and mirrors selected Masterway runtime values, including system state and port-level process-data information.
+### 1. Desktop Viewer
 
-For production deployments, OPC UA security policy, certificate management, network segmentation, and access rules should be reviewed according to the target plant requirements.
+File:
 
-## Excel Live Logging
+```text
+desktop/excel_viewer.py
+```
 
-For operator-friendly logging and quick engineering review, Masterway can be bridged from OPC UA into Microsoft Excel with a hybrid workflow:
+Responsibilities:
 
-- Live values are mirrored into an Excel workbook.
-- Durable CSV history is written in parallel so logging continues even if Excel is closed or crashes.
-- The bridge reconnects automatically if the OPC UA endpoint restarts.
+- operator UI
+- endpoint assembly and validation
+- node discovery workflow
+- history field staging
+- retention and archive configuration
+- runtime status reporting
+- performance timing display
+- worker lifecycle management
 
-Bridge files:
+### 2. OPC UA / Excel / CSV Bridge
+
+File:
 
 ```text
 desktop/tools/masterway_excel_bridge.py
-desktop/scripts/run_excel_bridge.ps1
-desktop/excel_viewer.py
-desktop/build_excel_viewer.ps1
-desktop/masterway_excel_viewer.spec
 ```
 
-Default outputs:
+Responsibilities:
 
-- Workbook: `%LOCALAPPDATA%\Masterway\excel\Masterway_OPCUA_Live.xlsx`
-- CSV log: `%LOCALAPPDATA%\Masterway\excel\masterway_opcua_YYYYMMDD.csv`
+- OPC UA client reads
+- browse path normalization
+- port classification
+- live snapshot generation
+- Excel workbook synchronization
+- per-port worksheet maintenance
+- selected-history filtering
+- CSV writing
+- retention pruning
+- archive CSV generation
 
-Typical usage:
+### 3. Packaging Layer
+
+Files:
+
+```text
+desktop/build_excel_viewer.ps1
+desktop/masterway_excel_viewer.spec
+desktop/installer/build_installer.ps1
+desktop/installer/masterway.iss
+```
+
+Responsibilities:
+
+- standalone Windows bundle generation with PyInstaller
+- asset inclusion
+- desktop runtime packaging
+- installer generation with Inno Setup
+
+## Runtime Data Flow
+
+```text
+External OPC UA Server
+        |
+        | browse + read loop
+        v
+OpcUaReader
+        |
+        | normalized runtime snapshots
+        v
+Desktop Worker Loop
+  - history field filter
+  - retention window
+  - archive export
+  - performance timing
+        |
+        +--> ExcelWorkbookBridge -> Live workbook / per-port sheets
+        |
+        +--> CsvHistoryWriter -> Main CSV / archive CSV
+        |
+        +--> Viewer UI -> status / node count / perf / control state
+```
+
+## Workbook Model
+
+### Live Sheet
+
+The global `Live` sheet shows the current discovered node set for the active endpoint.
+
+### Per-Port Sheets
+
+Per-port sheets group current values by inferred port classification so the engineer can focus on one device channel at a time.
+
+### History Sheet
+
+The global `History` sheet is the compact rolling history area for selected fields.
+
+### Per-Port History Sheets
+
+Per-port history sheets isolate retained signals by port. This is useful when only specific PDI fields should remain visible for a given channel.
+
+## Output Paths
+
+By default, outputs are written under:
+
+```text
+%LOCALAPPDATA%\Masterway\excel
+```
+
+Typical files:
+
+```text
+%LOCALAPPDATA%\Masterway\excel\Masterway_OPCUA_Live.xlsx
+%LOCALAPPDATA%\Masterway\excel\masterway_opcua_YYYYMMDD.csv
+%LOCALAPPDATA%\Masterway\excel\masterway_perf_YYYYMMDD.csv
+%LOCALAPPDATA%\Masterway\excel\retention-archive\masterway_retention_session_YYYYMMDD_HHMMSS.csv
+```
+
+The archive directory can also be changed from the UI.
+
+## Performance Model
+
+The desktop viewer exposes runtime measurements so the operator can understand where time is being spent. Typical metrics include:
+
+- OPC UA read time
+- Excel live write time
+- history write time
+- prune time
+- loop time
+- node count
+
+This is useful when tuning:
+
+- endpoint responsiveness
+- Excel workload
+- history field count
+- retention window size
+- archive behavior
+
+The current viewer configuration is optimized around a fast polling workflow with separate intervals for read, Excel, port-sheet sync, history writes, and reconnect attempts.
+
+## Intended Operator Workflow
+
+1. Launch the desktop application.
+2. Enter host/IP, port, and optional path, or use a full endpoint override.
+3. Click `Connect`.
+4. Review discovered PDI fields or other candidate nodes.
+5. Move only required fields into the history selection list.
+6. Choose the retention window and archive destination if needed.
+7. Click `Start Logging`.
+8. Use the live workbook and per-port sheets while CSV and archive output continue in the background.
+
+## Requirements
+
+### Runtime Requirements
+
+- Windows 10 or Windows 11
+- Microsoft Excel installed locally for workbook integration
+- Reachable OPC UA server endpoint
+
+### Source Build Requirements
+
+- Python 3.14.2
+- PowerShell
+- Inno Setup for installer generation
+
+### Python Dependencies
+
+The packaged desktop application bundles its runtime, but source execution requires Python packages.
+
+Desktop packages:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
+```
+
+OPC UA client package:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install opcua==0.98.13
+```
+
+If you are preparing a full local environment that also mirrors the wider repository tooling, you can additionally install:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+```
+
+## Run From Source
+
+Create the environment and launch the viewer:
+
+```powershell
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
+.\.venv\Scripts\python.exe -m pip install opcua==0.98.13
+.\.venv\Scripts\python.exe .\desktop\excel_viewer.py
+```
+
+If you want to run without the console window:
+
+```powershell
+.\.venv\Scripts\pythonw.exe .\desktop\excel_viewer.py
+```
+
+## CLI Bridge Execution
+
+For direct bridge execution without the full desktop UI:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\desktop\scripts\run_excel_bridge.ps1 `
@@ -255,7 +358,7 @@ powershell -ExecutionPolicy Bypass -File .\desktop\scripts\run_excel_bridge.ps1 
   -VisibleExcel
 ```
 
-Headless logging only:
+For CSV-oriented execution without showing Excel:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\desktop\scripts\run_excel_bridge.ps1 `
@@ -263,265 +366,119 @@ powershell -ExecutionPolicy Bypass -File .\desktop\scripts\run_excel_bridge.ps1 
   -NoExcel
 ```
 
-Notes:
+## Build The Windows EXE Bundle
 
-- Excel live integration uses Windows COM automation and requires Microsoft Excel on the PC.
-- If `pywin32` is not installed, the bridge still runs in CSV-only mode when `-NoExcel` is used.
-- If no explicit node list is supplied, the bridge can auto-discover external IO-Link `PDI Fields` nodes.
-- Discovered ports are also split into dedicated Excel sheets such as `Port 1`, `Port 2`, and `Port 7` for cleaner operator review.
-- History is available both as a global log and as per-port sheets such as `Port 7 History`.
-- You can omit `-Endpoint` and type the OPC UA endpoint interactively when the script starts.
-
-### Excel Viewer EXE
-
-For deployment to operator PCs, Masterway also includes a standalone desktop viewer with:
-
-- Host/IP input
-- Port input
-- Optional path input
-- `Connect` / `Disconnect` workflow
-- Live Excel launch
-- Per-port live sheets and per-port history sheets
-
-Build the viewer package:
+Build the packaged desktop application:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\desktop\build_excel_viewer.ps1
 ```
 
-Build output:
+Main output:
 
 ```text
 desktop\dist-excel-viewer\MasterwayExcelViewer\MasterwayExcelViewer.exe
 ```
 
-## IODD Library
+## Build The Windows Installer
 
-The IODD Library is used to manage uploaded IO-Link Device Description files.
+Generate the installer after the EXE bundle exists:
 
-Supported workflows:
+```powershell
+cd desktop
+powershell -ExecutionPolicy Bypass -File .\installer\build_installer.ps1 `
+  -SourceDir '..\dist-excel-viewer\MasterwayExcelViewer' `
+  -SetupName 'Masterway_OPCUA_Data_Logging_Setup'
+```
 
-- Upload IODD XML files.
-- Parse and index profile metadata.
-- Display vendor, profile, and file information.
-- Select uploaded profiles for process-data interpretation.
-- Delete uploaded IODD files and associated indexed profile data.
-
-Deletion is implemented as a real backend operation, not only a frontend state change. After deletion, the frontend refreshes the library list and provides success or error feedback.
-
-## ISDU Access
-
-Masterway provides ISDU read/write tooling for supported IO-Link masters and devices.
-
-The ISDU workflow is intended for:
-
-- Reading parameter values.
-- Writing configurable device parameters.
-- Validating index and subindex inputs.
-- Supporting engineering and commissioning tasks.
-
-Because ISDU write operations can change device behavior, production use should follow the device vendor documentation and site commissioning procedure.
-
-## Runtime Modes
-
-Masterway supports two runtime modes.
-
-Real mode:
-
-- Connects to an actual IO-Link master through Modbus TCP.
-- Uses the configured host and port.
-- Intended for commissioning, monitoring, and production validation.
-
-Simulator mode:
-
-- Uses an internal software simulator.
-- Allows UI, diagnostics, and integration testing without hardware.
-- Useful for development, demonstrations, and recovery testing.
-
-## Environment Configuration
-
-The backend can be configured through environment variables.
-
-Common settings:
+Installer output:
 
 ```text
-ICE2_DEFAULT_MODE=real|simulator
-USE_SIMULATOR=true|false
-PDI_POLL_INTERVAL_MS=20
-PDI_STALE_AFTER_MS=250
-PDI_RECONNECT_BASE_MS=250
-PDI_RECONNECT_MAX_MS=5000
-PDI_HISTORY_RETENTION_MS=3600000
-PDI_HISTORY_MAX_POINTS=240
-PDI_HISTORY_SAMPLE_INTERVAL_MS=100
-PDI_PAYLOAD_WORD_COUNT=<word-count>
-PDI_BLOCK_MODE=multiple|specific
-IODD_LIBRARY_DIR=<path>
-MASTERWAY_RUNTIME_SETTINGS_FILE=<path>
+desktop\installer\dist\Masterway_OPCUA_Data_Logging_Setup.exe
 ```
 
-ISDU settings:
+## Repository Layout
 
 ```text
-ICE2_ISDU_HTTP_SCHEME=http
-ICE2_ISDU_HTTP_PORT=80
-ICE2_ISDU_TIMEOUT_SECONDS=5.0
-ICE2_ISDU_HTTP_USERNAME=<optional-user>
-ICE2_ISDU_HTTP_PASSWORD=<optional-password>
+README.md
+desktop/
+  excel_viewer.py                    Main desktop operator UI
+  build_excel_viewer.ps1             PyInstaller build helper
+  masterway_excel_viewer.spec        PyInstaller spec
+  requirements.txt                   Desktop packaging/runtime dependencies
+  VERSION.txt                        Product version
+  assets/
+    masterway.ico                    Windows application icon
+    masterway-brand.png              Brand asset
+    masterway-brand-ui2.png          UI logo asset
+  tools/
+    masterway_excel_bridge.py        OPC UA / Excel / CSV bridge runtime
+  scripts/
+    run_excel_bridge.ps1             CLI bridge runner
+    opcua_smoke_test.ps1             Basic OPC UA smoke test
+  installer/
+    build_installer.ps1              Inno Setup wrapper
+    masterway.iss                    Installer definition
+backend/
+  requirements.txt                   Shared repository dependency list including opcua
 ```
 
-OPC UA settings:
+## Deployment Notes
 
-```text
-OPCUA_ENABLED=false
-OPCUA_HOST=0.0.0.0
-OPCUA_PORT=4840
-OPCUA_PATH=masterway
-OPCUA_NAMESPACE_URI=urn:masterway:opcua
-OPCUA_SERVER_NAME=Masterway OPC UA Server
-OPCUA_SECURITY_MODE=none
-OPCUA_ANONYMOUS=true
-OPCUA_WRITABLE=false
-```
+### Installer vs GitHub ZIP
 
-## Development Requirements
+A GitHub ZIP download is source code only. It is not the recommended operator delivery format.
 
-Current tested environment:
+Use one of the following for real deployment:
 
-- Windows 10/11
-- Python 3.14.2
-- Node.js 20 or newer recommended
-- npm
-- Git
+- packaged EXE bundle
+- generated Windows installer
 
-Backend dependencies are pinned in:
+### Excel Requirement
 
-```text
-backend/requirements.txt
-```
+Microsoft Excel must be installed on the target Windows PC if the workbook integration is required.
 
-Frontend dependencies are managed in:
+### OPC UA Security
 
-```text
-frontend/package.json
-```
+The current workflow is aimed primarily at engineering environments using direct endpoint access and common anonymous / no-security test setups. If your production endpoint requires certificates, security policies, or stricter authentication, validate that server policy before deployment.
 
-Desktop packaging dependencies are listed in:
+## Troubleshooting
 
-```text
-desktop/requirements.txt
-```
+### The endpoint is reachable in UaExpert but not in Masterway
 
-For production EXE packaging, use a fixed Python runtime and validate the complete PyInstaller output on a clean Windows machine.
+Check:
 
-## Development Setup
+- exact endpoint URL
+- port accessibility
+- path suffix such as `/masterway` if required by the server
+- local firewall rules
+- server security mode and authentication policy
 
-Create and prepare the Python environment:
+### Excel is open but updates feel slow
 
-```powershell
-py -3.14 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
-```
+Possible causes:
 
-Install frontend dependencies:
+- too many discovered nodes
+- too many fields staged for history
+- aggressive retention pruning
+- Excel COM delays on the PC
+- slow OPC UA server response
 
-```powershell
-cd frontend
-npm install
-```
+### History looks too large or hard to review
 
-Run the backend:
+Reduce the history selection list and enable an appropriate retention window so the archive CSV absorbs older rows while the active workbook remains compact.
 
-```powershell
-cd backend
-..\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
-```
+## Current Product Direction
 
-Run the frontend development server:
+This repository is positioned as a practical Windows OPC UA logging product with:
 
-```powershell
-cd frontend
-npm run dev
-```
+- compact operator UI
+- direct endpoint-driven workflow
+- Excel live monitoring
+- per-port sheet organization
+- selected-field history logging
+- rolling retention with archive export
+- EXE packaging
+- installer packaging
 
-Build the frontend:
-
-```powershell
-cd frontend
-npm run build
-```
-
-## Windows EXE Packaging
-
-The desktop package uses a local FastAPI backend and an embedded web UI shell.
-
-Install desktop packaging dependencies:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r desktop\requirements.txt
-.\.venv\Scripts\python.exe -m pip install pywebview --no-deps
-```
-
-Build the Windows desktop package:
-
-```powershell
-.\desktop\build_windows.ps1
-```
-
-Expected output:
-
-```text
-desktop\dist\Masterway\Masterway.exe
-```
-
-The build script first creates a production frontend build, then packages the desktop launcher and backend runtime with PyInstaller.
-
-## Validation Commands
-
-Recommended validation before committing or packaging:
-
-```powershell
-cd frontend
-npm run build
-npm run lint
-```
-
-```powershell
-cd ..
-python -m compileall backend
-```
-
-For OPC UA validation, start the backend, enable the OPC UA server from the UI, then connect with an OPC UA client such as UaExpert using the configured endpoint.
-
-## Security and Deployment Notes
-
-Masterway is intended for industrial environments and should be deployed with normal plant-network controls.
-
-Recommended production practices:
-
-- Keep the Masterway host on a trusted industrial network segment.
-- Restrict inbound access to required ports only.
-- Use Windows firewall rules for backend, OPC UA, and desktop runtime ports.
-- Keep OPC UA nodes read-only unless write support is explicitly engineered and tested.
-- Protect ISDU write workflows because they can change device behavior.
-- Avoid storing production credentials directly in source-controlled files.
-- Validate IODD files from trusted vendor sources.
-- Test EXE packaging on a clean target Windows machine before field deployment.
-
-## Product Direction
-
-Planned product-quality improvements:
-
-- Stronger OPC UA security profile and certificate handling.
-- More device-specific IODD decoding coverage.
-- Expanded diagnostic event handling.
-- Per-device templates for process-data maps.
-- Installer-based Windows deployment.
-- Signed executable and release packaging.
-- Persistent project profiles for plant-specific configurations.
-- Automated integration tests for backend API, PDI decode logic, and OPC UA node exposure.
-
-## Project Status
-
-Masterway is under active productization. The current codebase contains working monitoring, configuration, diagnostics, IODD, ISDU, OPC UA, and Windows packaging foundations. Further validation with real IO-Link hardware, plant-network constraints, and production deployment scenarios is required before operational release.
+It is intended to be easy to operate on a real engineering PC while remaining transparent enough for technical validation and troubleshooting.
