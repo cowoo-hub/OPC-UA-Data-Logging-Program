@@ -140,6 +140,17 @@ export interface OpcUaNodePreviewResponse {
   nodes: OpcUaNodePreview[]
 }
 
+export interface OpcUaPortCheckResponse {
+  requested_host: string
+  bind_host: string
+  endpoint_host: string
+  port: number
+  host_valid: boolean
+  available: boolean
+  in_use_by_masterway: boolean
+  message: string
+}
+
 export interface OpcUaConfigRequest {
   enabled: boolean
   host: string

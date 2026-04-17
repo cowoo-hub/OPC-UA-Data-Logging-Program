@@ -1084,6 +1084,44 @@ code {
   font-size: 0.74rem;
 }
 
+.opcua-panel__port-check {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.22rem 0.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(126, 176, 228, 0.14);
+  background: rgba(8, 14, 21, 0.36);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.opcua-panel__port-check-meta {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: rgba(178, 206, 232, 0.68);
+}
+
+.opcua-panel__port-check--success {
+  border-color: rgba(80, 220, 190, 0.32);
+  color: rgba(216, 245, 238, 0.92);
+}
+
+.opcua-panel__port-check--warning {
+  border-color: rgba(255, 199, 116, 0.36);
+  color: var(--warning);
+}
+
+.opcua-panel__port-check--error {
+  border-color: rgba(255, 107, 107, 0.4);
+  color: rgba(255, 186, 186, 0.9);
+}
+
+.opcua-panel__port-check--pending {
+  border-color: rgba(126, 176, 228, 0.18);
+  color: var(--muted);
+}
+
 .opcua-panel__grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

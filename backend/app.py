@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import logging
 import os
+import socket
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -343,6 +344,83 @@ def _create_opcua_service(settings: AppSettings) -> OPCUAService:
 def _get_opcua_service() -> OPCUAService | None:
     return getattr(app.state, "opcua_service", None)
 
+
+def _normalize_opcua_host(host: str) -> str:
+    trimmed = host.strip() or "0.0.0.0"
+    return "127.0.0.1" if trimmed.lower() == "localhost" else trimmed
+
+
+def _detect_advertised_host() -> str | None:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.settimeout(0.2)
+            sock.connect(("8.8.8.8", 80))
+            candidate = sock.getsockname()[0]
+            if candidate and not candidate.startswith("127."):
+                return candidate
+    except Exception:
+        pass
+
+    try:
+        candidate = socket.gethostbyname(socket.gethostname())
+        if candidate and not candidate.startswith("127."):
+            return candidate
+    except Exception:
+        pass
+
+    return None
+
+
+def _resolve_opcua_hosts(requested_host: str) -> tuple[str, str]:
+    normalized = requested_host.lower()
+    if normalized == "localhost":
+        requested_host = "127.0.0.1"
+
+    if requested_host in {"127.0.0.1", "0.0.0.0"}:
+        bind_host = requested_host
+    else:
+        bind_host = "0.0.0.0"
+
+    endpoint_host = requested_host
+    if requested_host == "0.0.0.0":
+        detected = _detect_advertised_host()
+        if detected:
+            endpoint_host = detected
+
+    return bind_host, endpoint_host
+
+
+def _resolve_host_addresses(host: str) -> list[str]:
+    try:
+        infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_STREAM)
+    except OSError:
+        return []
+
+    return sorted({info[4][0] for info in infos if info[4]})
+
+
+def _check_opcua_host_bindable(host: str) -> tuple[bool, str | None]:
+    if host in {"0.0.0.0", "127.0.0.1"}:
+        return True, None
+
+    resolved_hosts = _resolve_host_addresses(host)
+    if not resolved_hosts:
+        return False, f"Host {host} could not be resolved on this machine."
+
+    for candidate in resolved_hosts:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.bind((candidate, 0))
+            return True, None
+        except OSError:
+            continue
+
+    return False, f"Host {host} is not available on this PC. Use a local IP or 0.0.0.0."
+
+
+def _is_port_in_use_error(exc: OSError) -> bool:
+    winerror = getattr(exc, "winerror", None)
+    return exc.errno in {98, 10048, 10013} or winerror in {10048, 10013}
 
 def _coerce_bool(value: object, fallback: bool) -> bool:
     return value if isinstance(value, bool) else fallback
@@ -937,6 +1015,61 @@ def get_opcua_nodes() -> dict[str, object]:
         "opcua": opcua_service.get_status().to_dict() if opcua_service is not None else None,
         "polling": polling.to_dict(),
         **node_preview,
+    }
+
+
+@app.get("/opcua/port-check")
+def check_opcua_port(
+    host: str = Query(..., min_length=1),
+    port: int = Query(..., ge=1, le=65535),
+) -> dict[str, object]:
+    """Check whether a requested OPC UA host/port can be bound on this machine."""
+    normalized_host = _normalize_opcua_host(host)
+    bind_host, endpoint_host = _resolve_opcua_hosts(normalized_host)
+
+    host_valid, host_message = _check_opcua_host_bindable(normalized_host)
+    available = False
+    in_use_by_masterway = False
+    message = host_message
+
+    if host_valid:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.bind((bind_host, port))
+            available = True
+        except OSError as exc:
+            if _is_port_in_use_error(exc):
+                message = f"Port {port} is already in use on this machine."
+            else:
+                message = f"Port {port} cannot be bound on {bind_host}: {exc}"
+
+        if not available:
+            opcua_service = _get_opcua_service()
+            if (
+                opcua_service is not None
+                and opcua_service.get_status().running
+                and opcua_service.port == port
+            ):
+                in_use_by_masterway = True
+                available = True
+                message = (
+                    f"Port {port} is already bound by Masterway; applying will restart the server."
+                )
+
+    if message is None:
+        message = (
+            f"Port {port} is available. Server will bind on {bind_host} and advertise {endpoint_host}."
+        )
+
+    return {
+        "requested_host": normalized_host,
+        "bind_host": bind_host,
+        "endpoint_host": endpoint_host,
+        "port": port,
+        "host_valid": host_valid,
+        "available": available,
+        "in_use_by_masterway": in_use_by_masterway,
+        "message": message,
     }
 
 

@@ -341,16 +341,19 @@ def _configure_runtime_environment(bundle_root: Path, *, app_data_dir: Path) -> 
 
     logs_dir = app_data_dir / "logs"
     iodd_library_dir = app_data_dir / "iodd_library"
+    runtime_settings_file = app_data_dir / "runtime_settings.local.json"
     _seed_iodd_library(bundle_root, iodd_library_dir)
 
     os.environ["FRONTEND_DIST_DIR"] = str(frontend_dist_dir)
     os.environ["IODD_LIBRARY_DIR"] = str(iodd_library_dir)
+    os.environ["MASTERWAY_RUNTIME_SETTINGS_FILE"] = str(runtime_settings_file)
 
     return {
         "frontend_dist_dir": frontend_dist_dir,
         "app_data_dir": app_data_dir,
         "logs_dir": logs_dir,
         "iodd_library_dir": iodd_library_dir,
+        "runtime_settings_file": runtime_settings_file,
     }
 
 
@@ -578,6 +581,17 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Start the local backend, verify the packaged frontend/API path, then exit without opening a window.",
     )
+    parser.add_argument(
+        "--no-gui",
+        action="store_true",
+        help="Run the backend without opening a desktop window (useful for smoke tests).",
+    )
+    parser.add_argument(
+        "--run-seconds",
+        type=float,
+        default=0.0,
+        help="When --no-gui is set, keep the backend running for this many seconds before exiting.",
+    )
     return parser
 
 
@@ -625,6 +639,18 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.headless_check:
             _run_headless_smoke_check(backend_server)
+            return 0
+
+        if args.no_gui:
+            _emit_startup_status("Running without desktop UI.")
+            if args.run_seconds and args.run_seconds > 0:
+                time.sleep(args.run_seconds)
+            else:
+                try:
+                    while True:
+                        time.sleep(0.5)
+                except KeyboardInterrupt:
+                    _emit_startup_status("Headless run interrupted.")
             return 0
 
         _run_desktop_window(base_url=f"{backend_server.base_url}/", debug=args.debug)

@@ -19,6 +19,7 @@ import {
   fetchAllPortsPdi,
   fetchConnectionStatus,
   fetchIoddLibrary,
+  fetchOpcUaPortCheck,
   fetchOpcUaStatus,
   syncDisplayConfigs,
   updateOpcUaConfig,
@@ -35,6 +36,7 @@ import type {
   IoddDeviceProfile,
   OpcUaConfigRequest,
   OpcUaDraft,
+  OpcUaPortCheckResponse,
   OpcUaStatus,
   ParsedProcessDataProfile,
   PortDiagnostic,
@@ -140,11 +142,13 @@ export interface MonitoringWorkspace {
   connectionDraft: ConnectionDraft
   opcUaStatus: OpcUaStatus | null
   opcUaDraft: OpcUaDraft
+  opcUaPortCheck: OpcUaPortCheckResponse | null
   hasLoadedOnce: boolean
   isRefreshing: boolean
   isConnecting: boolean
   isDisconnecting: boolean
   isSavingOpcUa: boolean
+  isCheckingOpcUaPort: boolean
   banner: BannerState
   communicationPresentation: CommunicationPresentation
   severityCounts: {
@@ -169,6 +173,7 @@ export interface MonitoringWorkspace {
   setSelectedPortNumber: (value: number) => void
   setConnectionDraft: (value: ConnectionDraft) => void
   setOpcUaDraft: (value: OpcUaDraft) => void
+  checkOpcUaPort: (overrideDraft?: OpcUaDraft) => Promise<OpcUaPortCheckResponse | null>
   startPortLearning: (portNumber: number, durationMs: number) => void
   resetPortLearning: (portNumber: number) => void
   refreshDashboard: (options?: {
@@ -792,11 +797,14 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
   )
   const [opcUaStatus, setOpcUaStatus] = useState<OpcUaStatus | null>(null)
   const [opcUaDraft, setOpcUaDraft] = useState<OpcUaDraft>(() => buildOpcUaDraft(null))
+  const [opcUaPortCheck, setOpcUaPortCheck] =
+    useState<OpcUaPortCheckResponse | null>(null)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isSavingOpcUa, setIsSavingOpcUa] = useState(false)
+  const [isCheckingOpcUaPort, setIsCheckingOpcUaPort] = useState(false)
   const [banner, setBanner] = useState<BannerState>(() => buildBannerFromSnapshot(null))
   const connectionActionRef = useRef(false)
   const historyWindowRef = useRef(historyWindowMs)
@@ -1672,6 +1680,46 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     })
   }, [])
 
+  const checkOpcUaPort = useCallback(async (overrideDraft?: OpcUaDraft) => {
+    const draftToCheck = overrideDraft ?? opcUaDraftRef.current
+
+    if (!draftToCheck.enabled) {
+      setOpcUaPortCheck(null)
+      return null
+    }
+
+    const endpointParts = parseOpcUaEndpoint(draftToCheck.endpointUrl)
+    const host = endpointParts?.host ?? draftToCheck.host.trim()
+    const port = endpointParts?.port ?? Number(draftToCheck.port)
+
+    if (!host || !Number.isInteger(port) || port <= 0 || port > 65535) {
+      setOpcUaPortCheck(null)
+      return null
+    }
+
+    setIsCheckingOpcUaPort(true)
+    try {
+      const response = await fetchOpcUaPortCheck({ host, port })
+      setOpcUaPortCheck(response)
+      return response
+    } catch (error) {
+      const fallback = {
+        requested_host: host,
+        bind_host: host,
+        endpoint_host: host,
+        port,
+        host_valid: false,
+        available: false,
+        in_use_by_masterway: false,
+        message: getErrorMessage(error),
+      }
+      setOpcUaPortCheck(fallback)
+      return fallback
+    } finally {
+      setIsCheckingOpcUaPort(false)
+    }
+  }, [])
+
   const handleSaveOpcUa = useCallback(async (overrideDraft?: OpcUaDraft) => {
     const draftToSave = overrideDraft ?? opcUaDraft
     const endpointParts = parseOpcUaEndpoint(draftToSave.endpointUrl)
@@ -1698,6 +1746,18 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
         body: 'Enter a valid endpoint such as opc.tcp://127.0.0.1:4840/masterway plus namespace URI and server name.',
       })
       return
+    }
+
+    if (draftToSave.enabled) {
+      const portCheck = await checkOpcUaPort(draftToSave)
+      if (portCheck && (!portCheck.host_valid || !portCheck.available)) {
+        setBanner({
+          tone: 'error',
+          title: 'OPC UA endpoint unavailable',
+          body: portCheck.message,
+        })
+        return
+      }
     }
 
     const payload: OpcUaConfigRequest = {
@@ -1755,7 +1815,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
     } finally {
       setIsSavingOpcUa(false)
     }
-  }, [opcUaDraft, refreshOpcUaStatus])
+  }, [checkOpcUaPort, opcUaDraft, refreshOpcUaStatus])
 
   const updatePortDisplayOverride = useCallback(
     (portNumber: number, override: PortDisplayOverride) => {
@@ -1827,11 +1887,13 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       connectionDraft,
       opcUaStatus,
       opcUaDraft,
+      opcUaPortCheck,
       hasLoadedOnce,
       isRefreshing,
       isConnecting,
       isDisconnecting,
       isSavingOpcUa,
+      isCheckingOpcUaPort,
       banner,
       communicationPresentation,
       severityCounts,
@@ -1848,6 +1910,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       setSelectedPortNumber,
       setConnectionDraft,
       setOpcUaDraft,
+      checkOpcUaPort,
       startPortLearning,
       resetPortLearning,
       refreshDashboard,
@@ -1878,11 +1941,13 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       historyWindowMs,
       ioddProfiles,
       ioddProfilesById,
+      isCheckingOpcUaPort,
       isConnecting,
       isDisconnecting,
       isRefreshing,
       isSavingOpcUa,
       lastUpdatedLabel,
+      opcUaPortCheck,
       opcUaDraft,
       opcUaStatus,
       portDisplayOverrides,
@@ -1907,6 +1972,7 @@ export function useMonitoringWorkspace(): MonitoringWorkspace {
       setHistoryWindowMs,
       setSelectedPortNumber,
       aiLearningModels,
+      checkOpcUaPort,
       resetPortLearning,
       severityCounts,
       startPortLearning,

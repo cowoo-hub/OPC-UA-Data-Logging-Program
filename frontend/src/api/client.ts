@@ -23,6 +23,7 @@ import type {
   OpcUaConfigRequest,
   OpcUaConfigResponse,
   OpcUaNodePreviewResponse,
+  OpcUaPortCheckResponse,
   OpcUaStatusResponse,
   PortDisplayConfig,
   PortSeverity,
@@ -167,6 +168,18 @@ export async function fetchOpcUaStatus(): Promise<OpcUaStatusResponse> {
 
 export async function fetchOpcUaNodes(): Promise<OpcUaNodePreviewResponse> {
   return request<OpcUaNodePreviewResponse>('/opcua/nodes')
+}
+
+export async function fetchOpcUaPortCheck(params: {
+  host: string
+  port: number
+}): Promise<OpcUaPortCheckResponse> {
+  const searchParams = new URLSearchParams({
+    host: params.host,
+    port: String(params.port),
+  })
+
+  return request<OpcUaPortCheckResponse>(`/opcua/port-check?${searchParams.toString()}`)
 }
 
 export async function updateOpcUaConfig(

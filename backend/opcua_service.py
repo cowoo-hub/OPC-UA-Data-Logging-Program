@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import socket
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -11,9 +12,11 @@ logger = logging.getLogger("ice2.backend.opcua")
 
 try:
     from opcua import Server, ua
+    from opcua.server.binary_server_asyncio import BinaryServer
 except ModuleNotFoundError:
     Server = None
     ua = None
+    BinaryServer = None
 
 
 @dataclass(slots=True)
@@ -65,7 +68,9 @@ class OPCUAService:
         writable: bool = False,
     ) -> None:
         self._enabled = enabled
-        self._host = host.strip() or "0.0.0.0"
+        bind_host, endpoint_host = self._resolve_hosts(host)
+        self._bind_host = bind_host
+        self._endpoint_host = endpoint_host
         self._port = max(1, min(int(port), 65535))
         self._path = path.strip().strip("/") or "masterway"
         self._namespace_uri = namespace_uri.strip() or "urn:masterway:opcua"
@@ -91,8 +96,20 @@ class OPCUAService:
         return self._enabled
 
     @property
+    def bind_host(self) -> str:
+        return self._bind_host
+
+    @property
+    def endpoint_host(self) -> str:
+        return self._endpoint_host
+
+    @property
+    def port(self) -> int:
+        return self._port
+
+    @property
     def endpoint(self) -> str:
-        return f"opc.tcp://{self._host}:{self._port}/{self._path}"
+        return f"opc.tcp://{self._endpoint_host}:{self._port}/{self._path}"
 
     def start(self) -> None:
         if not self._enabled:
@@ -144,7 +161,7 @@ class OPCUAService:
     def get_status(self) -> OPCUAStatus:
         return OPCUAStatus(
             enabled=self._enabled,
-            configured=bool(self._host and self._port),
+            configured=bool(self._endpoint_host and self._port),
             running=self._running,
             endpoint=self.endpoint,
             namespace_uri=self._namespace_uri,
@@ -191,7 +208,9 @@ class OPCUAService:
     ) -> None:
         self.stop()
         self._enabled = enabled
-        self._host = host.strip() or "0.0.0.0"
+        bind_host, endpoint_host = self._resolve_hosts(host)
+        self._bind_host = bind_host
+        self._endpoint_host = endpoint_host
         self._port = max(1, min(int(port), 65535))
         self._path = path.strip().strip("/") or "masterway"
         self._namespace_uri = namespace_uri.strip() or "urn:masterway:opcua"
@@ -270,8 +289,13 @@ class OPCUAService:
             with self._lock:
                 self._server = server
                 self._namespace_index = namespace_index
-
-            server.start()
+            logger.info(
+                "OPC UA binding on %s:%s (advertising %s)",
+                self._bind_host,
+                self._port,
+                self.endpoint,
+            )
+            self._start_server(server)
             with self._lock:
                 self._running = True
                 self._last_error = None
@@ -279,13 +303,77 @@ class OPCUAService:
             logger.info("OPC UA server started at %s namespace=%s", self.endpoint, namespace_index)
             self._stop_event.wait()
         except Exception as exc:
+            message = str(exc)
+            if "bind" in message.lower():
+                message = (
+                    f"OPC UA failed to bind to {self._bind_host}:{self._port}. "
+                    "Verify the IP exists on this PC and the port is free."
+                )
             with self._lock:
                 self._running = False
-                self._last_error = str(exc)
+                self._last_error = message
             logger.exception("OPC UA server failed")
         finally:
             with self._lock:
                 self._running = False
+
+    def _start_server(self, server: Any) -> None:
+        if BinaryServer is None:
+            raise RuntimeError("Missing backend dependency 'opcua'")
+
+        server._setup_server_nodes()
+        server.iserver.start()
+
+        try:
+            bserver = BinaryServer(server.iserver, self._bind_host, self._port)
+            bserver.set_policies(server._policies)
+            bserver.set_loop(server.iserver.loop)
+            bserver.start()
+        except Exception:
+            server.iserver.stop()
+            raise
+
+        server.bserver = bserver
+
+    def _resolve_hosts(self, host: str) -> tuple[str, str]:
+        requested_host = host.strip() or "0.0.0.0"
+        normalized = requested_host.lower()
+        if normalized == "localhost":
+            requested_host = "127.0.0.1"
+
+        if requested_host in {"127.0.0.1", "0.0.0.0"}:
+            bind_host = requested_host
+        else:
+            bind_host = "0.0.0.0"
+
+        endpoint_host = requested_host
+        if requested_host == "0.0.0.0":
+            detected = self._detect_advertised_host()
+            if detected:
+                endpoint_host = detected
+
+        return bind_host, endpoint_host
+
+    @staticmethod
+    def _detect_advertised_host() -> str | None:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.settimeout(0.2)
+                sock.connect(("8.8.8.8", 80))
+                candidate = sock.getsockname()[0]
+                if candidate and not candidate.startswith("127."):
+                    return candidate
+        except Exception:
+            pass
+
+        try:
+            candidate = socket.gethostbyname(socket.gethostname())
+            if candidate and not candidate.startswith("127."):
+                return candidate
+        except Exception:
+            pass
+
+        return None
 
     def _build_node_model(self, server: Any, namespace_index: int) -> None:
         objects = server.get_objects_node()

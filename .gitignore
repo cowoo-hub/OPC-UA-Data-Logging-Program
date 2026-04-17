@@ -36,3 +36,8 @@ node_modules/
 .pytest_cache/
 .mypy_cache/
 .restart-logs/
+.tmp_pip/
+desktop/backups/
+desktop/build*/
+desktop/dist*/
+desktop/installer/dist/

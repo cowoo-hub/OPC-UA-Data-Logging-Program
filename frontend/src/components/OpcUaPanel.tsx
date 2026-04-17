@@ -43,6 +43,7 @@ function OpcUaPanel() {
   const workspace = useMonitoringWorkspaceContext()
   const draft = workspace.opcUaDraft
   const status = workspace.opcUaStatus
+  const portCheck = workspace.opcUaPortCheck
   const [nodePreview, setNodePreview] = useState<OpcUaNodePreview[]>([])
   const [nodeCount, setNodeCount] = useState(0)
   const [nodePreviewError, setNodePreviewError] = useState<string | null>(null)
@@ -57,6 +58,19 @@ function OpcUaPanel() {
       ),
     [draft.enabled, status?.configured, status?.last_error, status?.running],
   )
+  const portCheckTone = useMemo(() => {
+    if (!portCheck) {
+      return 'pending'
+    }
+    if (!portCheck.host_valid || !portCheck.available) {
+      return 'error'
+    }
+    if (portCheck.in_use_by_masterway) {
+      return 'warning'
+    }
+    return 'success'
+  }, [portCheck])
+  const isPortBlocked = Boolean(portCheck && (!portCheck.host_valid || !portCheck.available))
   const visibleNodes = useMemo(() => nodePreview.slice(0, 120), [nodePreview])
 
   useEffect(() => {
@@ -98,6 +112,27 @@ function OpcUaPanel() {
       window.clearInterval(intervalId)
     }
   }, [draft.enabled, status?.running])
+
+  useEffect(() => {
+    if (!draft.enabled) {
+      void workspace.checkOpcUaPort(draft)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void workspace.checkOpcUaPort(draft)
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [
+    draft.enabled,
+    draft.endpointUrl,
+    draft.host,
+    draft.port,
+    workspace.checkOpcUaPort,
+  ])
 
   function updateEndpoint(endpointUrl: string) {
     const match = endpointUrl
@@ -163,6 +198,21 @@ function OpcUaPanel() {
           onChange={(event) => updateEndpoint(event.target.value)}
         />
       </label>
+
+      {workspace.isCheckingOpcUaPort || portCheck ? (
+        <div className={`opcua-panel__port-check opcua-panel__port-check--${portCheckTone}`}>
+          <span>
+            {workspace.isCheckingOpcUaPort
+              ? 'Checking port availability...'
+              : portCheck?.message}
+          </span>
+          {portCheck ? (
+            <span className="opcua-panel__port-check-meta">
+              Bind {portCheck.bind_host} · Advertise {portCheck.endpoint_host}:{portCheck.port}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="opcua-panel__grid">
         <label className="control-field">
@@ -308,7 +358,7 @@ function OpcUaPanel() {
           type="button"
           className="action-button action-button--primary action-button--compact"
           onClick={() => void workspace.handleSaveOpcUa()}
-          disabled={workspace.isSavingOpcUa}
+          disabled={workspace.isSavingOpcUa || isPortBlocked}
         >
           {workspace.isSavingOpcUa ? 'Applying...' : 'Save OPC UA'}
         </button>

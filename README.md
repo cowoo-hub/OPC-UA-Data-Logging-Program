@@ -224,6 +224,77 @@ The OPC UA implementation exposes a live node preview in the UI and mirrors sele
 
 For production deployments, OPC UA security policy, certificate management, network segmentation, and access rules should be reviewed according to the target plant requirements.
 
+## Excel Live Logging
+
+For operator-friendly logging and quick engineering review, Masterway can be bridged from OPC UA into Microsoft Excel with a hybrid workflow:
+
+- Live values are mirrored into an Excel workbook.
+- Durable CSV history is written in parallel so logging continues even if Excel is closed or crashes.
+- The bridge reconnects automatically if the OPC UA endpoint restarts.
+
+Bridge files:
+
+```text
+desktop/tools/masterway_excel_bridge.py
+desktop/scripts/run_excel_bridge.ps1
+desktop/excel_viewer.py
+desktop/build_excel_viewer.ps1
+desktop/masterway_excel_viewer.spec
+```
+
+Default outputs:
+
+- Workbook: `%LOCALAPPDATA%\Masterway\excel\Masterway_OPCUA_Live.xlsx`
+- CSV log: `%LOCALAPPDATA%\Masterway\excel\masterway_opcua_YYYYMMDD.csv`
+
+Typical usage:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\desktop\scripts\run_excel_bridge.ps1 `
+  -Endpoint "opc.tcp://192.168.1.108:4840" `
+  -VisibleExcel
+```
+
+Headless logging only:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\desktop\scripts\run_excel_bridge.ps1 `
+  -Endpoint "opc.tcp://192.168.1.108:4840" `
+  -NoExcel
+```
+
+Notes:
+
+- Excel live integration uses Windows COM automation and requires Microsoft Excel on the PC.
+- If `pywin32` is not installed, the bridge still runs in CSV-only mode when `-NoExcel` is used.
+- If no explicit node list is supplied, the bridge can auto-discover external IO-Link `PDI Fields` nodes.
+- Discovered ports are also split into dedicated Excel sheets such as `Port 1`, `Port 2`, and `Port 7` for cleaner operator review.
+- History is available both as a global log and as per-port sheets such as `Port 7 History`.
+- You can omit `-Endpoint` and type the OPC UA endpoint interactively when the script starts.
+
+### Excel Viewer EXE
+
+For deployment to operator PCs, Masterway also includes a standalone desktop viewer with:
+
+- Host/IP input
+- Port input
+- Optional path input
+- `Connect` / `Disconnect` workflow
+- Live Excel launch
+- Per-port live sheets and per-port history sheets
+
+Build the viewer package:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\desktop\build_excel_viewer.ps1
+```
+
+Build output:
+
+```text
+desktop\dist-excel-viewer\MasterwayExcelViewer\MasterwayExcelViewer.exe
+```
+
 ## IODD Library
 
 The IODD Library is used to manage uploaded IO-Link Device Description files.
@@ -454,4 +525,3 @@ Planned product-quality improvements:
 ## Project Status
 
 Masterway is under active productization. The current codebase contains working monitoring, configuration, diagnostics, IODD, ISDU, OPC UA, and Windows packaging foundations. Further validation with real IO-Link hardware, plant-network constraints, and production deployment scenarios is required before operational release.
-

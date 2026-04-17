@@ -1,6 +1,7 @@
 -r ../backend/requirements.txt
 # pywebview is installed separately with --no-deps so Windows packaging does not pull pythonnet.
 pyinstaller==6.16.0
+pywin32==311 ; platform_system == "Windows"
 QtPy==2.4.3
 PySide6==6.10.2
 bottle==0.13.4
