@@ -13,6 +13,11 @@ datas = []
 datas += collect_data_files("win32com")
 datas += copy_metadata("opcua")
 datas += copy_metadata("pywin32")
+datas += [
+    (str(DESKTOP_ASSETS_DIR / "masterway-brand-ui2.png"), "assets"),
+    (str(DESKTOP_ASSETS_DIR / "masterway-brand.png"), "assets"),
+    (str(DESKTOP_ASSETS_DIR / "masterway-icon-256.png"), "assets"),
+]
 
 hiddenimports = [
     "pythoncom",
