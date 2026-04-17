@@ -71,7 +71,7 @@ class ViewerConfig:
     poll_ms: int = 30
     excel_ms: int = 140
     port_sheet_ms: int = 1000
-    history_ms: int = 300
+    history_ms: int = 1000
     save_ms: int = 120000
     reconnect_ms: int = 2000
 
@@ -978,7 +978,7 @@ class ViewerApp:
                             excel_bridge = ExcelWorkbookBridge(workbook_path=config.workbook_path, visible=config.visible_excel, write_history=True, reuse_existing_workbook=True, prefer_running_excel=True)
                             excel_bridge.open()
                             csv_writer.reset()
-                            excel_bridge.reset_history()
+                            excel_bridge.reset_live_session()
                             active_port_sheet_names = selected_port_sheet_names(snapshots)
                             excel_bridge.sync_port_view_sheets(active_port_sheet_names)
                             last_synced_port_sheet_names = set(active_port_sheet_names)

@@ -1327,6 +1327,85 @@ ExcelWorkbookBridge.sync_port_view_sheets = _sync_port_view_sheets
 _original_update_live = ExcelWorkbookBridge.update_live
 
 
+def _clear_sheet_row_cells(sheet: Any, row_index: int, end_column: str) -> None:
+    if row_index < 1:
+        return
+    try:
+        sheet.Range(f"A{row_index}:{end_column}{row_index}").ClearContents()
+    except Exception:
+        try:
+            sheet.Rows(str(row_index)).Delete()
+        except Exception:
+            pass
+
+
+def _reset_live_session(self) -> None:
+    live_sheet = getattr(self, "_live_sheet", None)
+    if live_sheet is not None:
+        self._clear_sheet_rows(live_sheet, start_row=6)
+
+    if hasattr(self, "_row_map") and isinstance(self._row_map, dict):
+        self._row_map.clear()
+    if hasattr(self, "_live_last_written") and isinstance(self._live_last_written, dict):
+        self._live_last_written.clear()
+
+    self.sync_port_view_sheets(set())
+    self.reset_history()
+
+    if hasattr(self, "_current_endpoint"):
+        self._current_endpoint = ""
+    if hasattr(self, "_last_meta_refresh_at"):
+        self._last_meta_refresh_at = 0.0
+
+
+def _prune_stale_live_rows(self, active_browse_paths: set[str]) -> None:
+    row_map = getattr(self, "_row_map", None)
+    live_sheet = getattr(self, "_live_sheet", None)
+    if not isinstance(row_map, dict) or live_sheet is None:
+        return
+
+    live_cache = getattr(self, "_live_last_written", None)
+    active = {str(path) for path in active_browse_paths}
+    for browse_path, row_index in list(row_map.items()):
+        if browse_path in active:
+            continue
+        _clear_sheet_row_cells(live_sheet, int(row_index), "G")
+        row_map.pop(browse_path, None)
+        if isinstance(live_cache, dict):
+            live_cache.pop(browse_path, None)
+
+
+def _prune_stale_port_rows(self, snapshots: dict[str, NodeSnapshot]) -> None:
+    port_sheets = getattr(self, "_port_sheets", None)
+    port_row_maps = getattr(self, "_port_sheet_rows", None)
+    port_last_written = getattr(self, "_port_last_written", None)
+    if not isinstance(port_sheets, dict) or not isinstance(port_row_maps, dict):
+        return
+
+    active_by_sheet: dict[str, set[str]] = {}
+    for browse_path in snapshots:
+        port_view = classify_port_view(str(browse_path))
+        if port_view is None:
+            continue
+        active_by_sheet.setdefault(port_view.sheet_name, set()).add(port_view.full_path)
+
+    for sheet_name, row_map in list(port_row_maps.items()):
+        if not isinstance(row_map, dict):
+            continue
+        active_paths = active_by_sheet.get(sheet_name, set())
+        sheet = port_sheets.get(sheet_name)
+        sheet_cache = port_last_written.get(sheet_name) if isinstance(port_last_written, dict) else None
+
+        for full_path, row_index in list(row_map.items()):
+            if full_path in active_paths:
+                continue
+            if sheet is not None:
+                _clear_sheet_row_cells(sheet, int(row_index), "H")
+            row_map.pop(full_path, None)
+            if isinstance(sheet_cache, dict):
+                sheet_cache.pop(full_path, None)
+
+
 def _patched_update_live(
     self,
     endpoint: str,
@@ -1334,13 +1413,22 @@ def _patched_update_live(
     include_port_sheets: bool = True,
     port_snapshots: dict[str, NodeSnapshot] | None = None,
 ) -> None:
+    active_live_paths = {str(browse_path) for browse_path in snapshots}
+    self._prune_stale_live_rows(active_live_paths)
+
+    active_snapshots = port_snapshots if port_snapshots is not None else snapshots
+    if include_port_sheets:
+        self._prune_stale_port_rows(active_snapshots)
+
     _original_update_live(self, endpoint, snapshots, include_port_sheets=False)
     if not include_port_sheets:
         return
-    active_snapshots = port_snapshots if port_snapshots is not None else snapshots
     self._update_port_sheets(endpoint, active_snapshots)
 
 
+ExcelWorkbookBridge.reset_live_session = _reset_live_session
+ExcelWorkbookBridge._prune_stale_live_rows = _prune_stale_live_rows
+ExcelWorkbookBridge._prune_stale_port_rows = _prune_stale_port_rows
 ExcelWorkbookBridge.update_live = _patched_update_live
 
 
@@ -1351,19 +1439,19 @@ def _prepare_history_sheet_compact(self) -> None:
     sheet = self._history_sheet
     if sheet is None:
         return
-    if sheet.Cells(1, 1).Value:
-        return
+    is_initialized = bool(sheet.Cells(1, 1).Value)
 
-    headers = [
-        "Timestamp KST",
-        "Browse Path",
-        "Value",
-        "Type",
-        "Server Timestamp",
-        "Status",
-    ]
-    for column_index, header in enumerate(headers, start=1):
-        sheet.Cells(1, column_index).Value = header
+    if not is_initialized:
+        headers = [
+            "Timestamp KST",
+            "Browse Path",
+            "Value",
+            "Type",
+            "Server Timestamp",
+            "Status",
+        ]
+        for column_index, header in enumerate(headers, start=1):
+            sheet.Cells(1, column_index).Value = header
 
     sheet.Range("A1:F1").Font.Bold = True
     sheet.Columns("A").ColumnWidth = 28
@@ -1372,6 +1460,8 @@ def _prepare_history_sheet_compact(self) -> None:
     sheet.Columns("D").ColumnWidth = 14
     sheet.Columns("E").ColumnWidth = 24
     sheet.Columns("F").ColumnWidth = 16
+    sheet.Columns("A").NumberFormat = "yyyy-mm-dd hh:mm:ss"
+    sheet.Columns("E").NumberFormat = "yyyy-mm-dd hh:mm:ss"
     sheet.Range("A1:F1").Interior.Color = self._rgb(27, 43, 58)
     sheet.Range("A1:F1").Font.Color = self._rgb(255, 255, 255)
     sheet.Rows("1:1").RowHeight = 22
@@ -1379,25 +1469,25 @@ def _prepare_history_sheet_compact(self) -> None:
 
 
 def _prepare_port_history_sheet_compact(self, sheet: Any, port_sheet_name: str) -> None:
-    if sheet.Cells(1, 1).Value:
-        return
+    is_initialized = bool(sheet.Cells(1, 1).Value)
 
-    sheet.Cells(1, 1).Value = "OPC UA Endpoint"
-    sheet.Cells(2, 1).Value = "Last Refresh (KST)"
-    sheet.Cells(3, 1).Value = "History Sheet"
-    sheet.Cells(3, 2).Value = port_sheet_name
+    if not is_initialized:
+        sheet.Cells(1, 1).Value = "OPC UA Endpoint"
+        sheet.Cells(2, 1).Value = "Last Refresh (KST)"
+        sheet.Cells(3, 1).Value = "History Sheet"
+        sheet.Cells(3, 2).Value = port_sheet_name
 
-    headers = [
-        "Timestamp KST",
-        "Field",
-        "Browse Path",
-        "Value",
-        "Type",
-        "Server Timestamp",
-        "Status",
-    ]
-    for column_index, header in enumerate(headers, start=1):
-        sheet.Cells(5, column_index).Value = header
+        headers = [
+            "Timestamp KST",
+            "Field",
+            "Browse Path",
+            "Value",
+            "Type",
+            "Server Timestamp",
+            "Status",
+        ]
+        for column_index, header in enumerate(headers, start=1):
+            sheet.Cells(5, column_index).Value = header
 
     sheet.Range("A5:G5").Font.Bold = True
     sheet.Range("A1:B3").Font.Bold = True
@@ -1408,6 +1498,8 @@ def _prepare_port_history_sheet_compact(self, sheet: Any, port_sheet_name: str) 
     sheet.Columns("E").ColumnWidth = 14
     sheet.Columns("F").ColumnWidth = 24
     sheet.Columns("G").ColumnWidth = 16
+    sheet.Columns("A").NumberFormat = "yyyy-mm-dd hh:mm:ss"
+    sheet.Columns("F").NumberFormat = "yyyy-mm-dd hh:mm:ss"
     sheet.Range("A1:B3").Interior.Color = self._rgb(16, 25, 36)
     sheet.Range("A1:A3").Font.Color = self._rgb(135, 207, 226)
     sheet.Range("A5:G5").Interior.Color = self._rgb(27, 43, 58)
@@ -1476,6 +1568,8 @@ def _append_history_compact(self, rows: list[list[Any]]) -> None:
 
     if sanitized_rows:
         end_row = start_row + len(sanitized_rows) - 1
+        sheet.Range(f"A{start_row}:A{end_row}").NumberFormat = "yyyy-mm-dd hh:mm:ss"
+        sheet.Range(f"E{start_row}:E{end_row}").NumberFormat = "yyyy-mm-dd hh:mm:ss"
         sheet.Range(f"A{start_row}:F{end_row}").Value = sanitized_rows
 
     created_history_sheet = False
@@ -1485,6 +1579,8 @@ def _append_history_compact(self, rows: list[list[Any]]) -> None:
         self._update_sheet_meta(port_history_sheet, self._current_endpoint)
         port_start_row = port_history_sheet.Cells(port_history_sheet.Rows.Count, 1).End(-4162).Row + 1
         port_end_row = port_start_row + len(port_rows) - 1
+        port_history_sheet.Range(f"A{port_start_row}:A{port_end_row}").NumberFormat = "yyyy-mm-dd hh:mm:ss"
+        port_history_sheet.Range(f"F{port_start_row}:F{port_end_row}").NumberFormat = "yyyy-mm-dd hh:mm:ss"
         port_history_sheet.Range(f"A{port_start_row}:G{port_end_row}").Value = port_rows
 
     if created_history_sheet:
@@ -1504,5 +1600,5 @@ ExcelWorkbookBridge.append_history = _append_history_compact
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = _original_build_argument_parser()
-    parser.set_defaults(poll_ms=40, excel_ms=120, history_ms=300)
+    parser.set_defaults(poll_ms=40, excel_ms=120, history_ms=1000)
     return parser
