@@ -15,6 +15,7 @@ import os
 import queue
 import threading
 import time
+import traceback
 import tkinter as tk
 import webbrowser
 from dataclasses import dataclass
@@ -71,7 +72,7 @@ class ViewerConfig:
     poll_ms: int = 30
     excel_ms: int = 140
     port_sheet_ms: int = 1000
-    history_ms: int = 1000
+    history_ms: int = 500
     save_ms: int = 120000
     reconnect_ms: int = 2000
 
@@ -819,6 +820,7 @@ class ViewerApp:
         reader = OpcUaReader(config.endpoint, None, [], "pdi-fields")
         csv_writer = CsvHistoryWriter(config.csv_path)
         perf_log_path = config.workbook_path.parent / f"masterway_perf_{datetime.now():%Y%m%d}.csv"
+        runtime_log_path = config.workbook_path.parent / f"masterway_runtime_{datetime.now():%Y%m%d}.log"
         perf_header_written = perf_log_path.exists() and perf_log_path.stat().st_size > 0
         excel_bridge: ExcelWorkbookBridge | None = None
         next_excel_at = 0.0
@@ -834,6 +836,18 @@ class ViewerApp:
         session_archive_path: Path | None = None
         last_synced_port_sheet_names: set[str] | None = None
         logging_requested = False
+
+        def append_runtime_log(context: str, exc: Exception) -> None:
+            runtime_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with runtime_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(f"[{datetime.now().isoformat()}] {context}\n")
+                handle.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+                handle.write("\n")
+
+        def append_runtime_note(message: str) -> None:
+            runtime_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with runtime_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(f"[{datetime.now().isoformat()}] NOTE {message}\n")
 
         def selected_port_sheet_names(current_snapshots: dict[str, Any]) -> set[str]:
             source_paths = current_snapshots.keys() if history_filter_paths is None else history_filter_paths
@@ -864,6 +878,7 @@ class ViewerApp:
         def reset_excel_runtime(current_now: float, operation: str, exc: Exception) -> None:
             nonlocal excel_bridge, excel_ready, next_excel_at, next_port_sheet_at, next_history_at, next_save_at
             nonlocal next_prune_at, last_synced_port_sheet_names
+            nonlocal logging_requested
 
             if is_excel_busy_error(exc):
                 retry_at = current_now + 1.2
@@ -885,6 +900,7 @@ class ViewerApp:
                 )
                 return
 
+            append_runtime_log(f"excel_bridge:{operation}", exc)
             if excel_bridge is not None:
                 try:
                     excel_bridge.close()
@@ -892,6 +908,7 @@ class ViewerApp:
                     pass
             excel_bridge = None
             excel_ready = False
+            logging_requested = False
             last_synced_port_sheet_names = None
             retry_at = current_now + 2.0
             next_excel_at = retry_at
@@ -899,12 +916,13 @@ class ViewerApp:
             next_history_at = retry_at
             next_save_at = retry_at
             next_prune_at = retry_at
+            outbound.put(("logging_state", False))
             outbound.put(
                 (
                     "status",
                     (
-                        "Running",
-                        f"Excel bridge error during {operation}. OPC UA remains connected; reinitializing workbook bridge. {exc}",
+                        "Connected",
+                        f"Excel bridge error during {operation}. Logging stopped and the workbook was closed. Review runtime log, then click Start Logging again. {exc}",
                         "#6b3e25",
                         "#fff0e8",
                     ),
@@ -975,11 +993,15 @@ class ViewerApp:
                     if logging_requested and not excel_ready and now >= next_excel_at:
                         outbound.put(("status", ("Launching Excel", "OPC UA connected. Launching the Excel workbook...", "#284b67", "#ffffff")))
                         try:
-                            excel_bridge = ExcelWorkbookBridge(workbook_path=config.workbook_path, visible=config.visible_excel, write_history=True, reuse_existing_workbook=True, prefer_running_excel=True)
+                            append_runtime_note("launch: create dedicated Excel bridge")
+                            excel_bridge = ExcelWorkbookBridge(workbook_path=config.workbook_path, visible=config.visible_excel, write_history=True, reuse_existing_workbook=True, prefer_running_excel=False)
+                            append_runtime_note("launch: open workbook")
                             excel_bridge.open()
+                            append_runtime_note("launch: reset csv and workbook session")
                             csv_writer.reset()
                             excel_bridge.reset_live_session()
                             active_port_sheet_names = selected_port_sheet_names(snapshots)
+                            append_runtime_note(f"launch: sync port sheets {sorted(active_port_sheet_names)}")
                             excel_bridge.sync_port_view_sheets(active_port_sheet_names)
                             last_synced_port_sheet_names = set(active_port_sheet_names)
                             session_archive_path = CsvHistoryWriter.build_session_archive_path(archive_dir) if archive_dir else None
@@ -991,6 +1013,7 @@ class ViewerApp:
                             outbound.put(("workbook", str(config.workbook_path)))
                             outbound.put(("csv", str(config.csv_path)))
                             outbound.put(("logging_state", True))
+                            append_runtime_note("launch: excel bridge ready")
                             outbound.put(("status", ("Running", f"Connected to {config.endpoint} and opened {config.workbook_path.name}.", "#1f5c50", "#d7fff5")))
                             excel_ready = True
                         except Exception as exc:
@@ -1095,11 +1118,14 @@ class ViewerApp:
                     if sleep_seconds > 0 and stop_event.wait(sleep_seconds):
                         break
                 except Exception as exc:
+                    append_runtime_log("worker_main:loop", exc)
+                    outbound.put(("logging_state", False))
                     outbound.put(("status", ("Reconnecting", str(exc), "#6b3e25", "#fff0e8")))
                     reader.disconnect()
                     if stop_event.wait(reconnect_seconds):
                         break
         except Exception as exc:
+            append_runtime_log("worker_main:fatal", exc)
             outbound.put(("fatal", str(exc)))
         finally:
             reader.disconnect()

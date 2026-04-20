@@ -1435,6 +1435,89 @@ ExcelWorkbookBridge.update_live = _patched_update_live
 _original_build_argument_parser = build_argument_parser
 
 
+_original_write_row = ExcelWorkbookBridge._write_row
+
+
+def _patched_write_row(sheet: Any, row: int, start_column: int, values: list[Any]) -> None:
+    # Live/port sheets previously wrote:
+    # value, type, status, source_timestamp, server_timestamp, updated_at
+    # Remove source_timestamp while keeping the rest of the layout stable.
+    if start_column in {2, 3} and isinstance(values, list) and len(values) == 6:
+        values = [values[0], values[1], values[2], values[4], values[5]]
+    _original_write_row(sheet, row, start_column, values)
+
+
+def _prepare_live_sheet_without_source(self) -> None:
+    sheet = self._live_sheet
+    if sheet is None:
+        return
+
+    sheet.Cells(1, 1).Value = "OPC UA Endpoint"
+    sheet.Cells(2, 1).Value = "Last Refresh (UTC)"
+    sheet.Cells(5, 1).Value = "Browse Path"
+    sheet.Cells(5, 2).Value = "Live Value"
+    sheet.Cells(5, 3).Value = "Type"
+    sheet.Cells(5, 4).Value = "Status"
+    sheet.Cells(5, 5).Value = "Server Timestamp"
+    sheet.Cells(5, 6).Value = "Updated At"
+
+    sheet.Range("A5:F5").Font.Bold = True
+    sheet.Columns("A").ColumnWidth = 48
+    sheet.Columns("B").ColumnWidth = 22
+    sheet.Columns("C").ColumnWidth = 14
+    sheet.Columns("D").ColumnWidth = 16
+    sheet.Columns("E").ColumnWidth = 24
+    sheet.Columns("F").ColumnWidth = 28
+    sheet.Range("G1:G5").ClearContents()
+    sheet.Columns("E:F").NumberFormat = "yyyy-mm-dd hh:mm:ss"
+    sheet.Range("A1:F2").Font.Bold = True
+    sheet.Range("A1:F2").Interior.Color = self._rgb(16, 25, 36)
+    sheet.Range("A1:A2").Font.Color = self._rgb(135, 207, 226)
+    sheet.Range("A5:F5").Interior.Color = self._rgb(27, 43, 58)
+    sheet.Range("A5:F5").Font.Color = self._rgb(255, 255, 255)
+    sheet.Rows("1:2").RowHeight = 21
+    sheet.Rows("5:5").RowHeight = 22
+    sheet.Columns("A:F").HorizontalAlignment = -4131
+    sheet.Range("B:B").Font.Bold = True
+    self._format_sheet_base(sheet, "Live Overview")
+
+
+def _prepare_port_sheet_without_source(self, sheet: Any, endpoint: str, sheet_name: str) -> None:
+    sheet.Cells(1, 1).Value = "OPC UA Endpoint"
+    sheet.Cells(1, 2).Value = endpoint
+    sheet.Cells(2, 1).Value = "Last Refresh (UTC)"
+    sheet.Cells(2, 2).Value = utc_now_iso()
+    sheet.Cells(3, 1).Value = "Port Sheet"
+    sheet.Cells(3, 2).Value = sheet_name
+
+    sheet.Cells(5, 1).Value = "Field"
+    sheet.Cells(5, 2).Value = "Browse Path"
+    sheet.Cells(5, 3).Value = "Live Value"
+    sheet.Cells(5, 4).Value = "Type"
+    sheet.Cells(5, 5).Value = "Status"
+    sheet.Cells(5, 6).Value = "Server Timestamp"
+    sheet.Cells(5, 7).Value = "Updated At"
+
+    sheet.Range("A5:G5").Font.Bold = True
+    sheet.Range("A1:B3").Font.Bold = True
+    sheet.Columns("A").ColumnWidth = 28
+    sheet.Columns("B").ColumnWidth = 56
+    sheet.Columns("C").ColumnWidth = 22
+    sheet.Columns("D").ColumnWidth = 14
+    sheet.Columns("E").ColumnWidth = 16
+    sheet.Columns("F").ColumnWidth = 24
+    sheet.Columns("G").ColumnWidth = 28
+    sheet.Columns("F:G").NumberFormat = "yyyy-mm-dd hh:mm:ss"
+    sheet.Range("H1:H5").ClearContents()
+    sheet.Range("A1:B3").Interior.Color = self._rgb(16, 25, 36)
+    sheet.Range("A1:A3").Font.Color = self._rgb(135, 207, 226)
+    sheet.Range("A5:G5").Interior.Color = self._rgb(27, 43, 58)
+    sheet.Range("A5:G5").Font.Color = self._rgb(255, 255, 255)
+    sheet.Rows("1:3").RowHeight = 21
+    sheet.Rows("5:5").RowHeight = 22
+    self._format_sheet_base(sheet, f"{sheet_name} PDI Fields")
+
+
 def _prepare_history_sheet_compact(self) -> None:
     sheet = self._history_sheet
     if sheet is None:
@@ -1596,9 +1679,12 @@ def _append_history_compact(self, rows: list[list[Any]]) -> None:
 ExcelWorkbookBridge._prepare_history_sheet = _prepare_history_sheet_compact
 ExcelWorkbookBridge._prepare_port_history_sheet = _prepare_port_history_sheet_compact
 ExcelWorkbookBridge.append_history = _append_history_compact
+ExcelWorkbookBridge._write_row = staticmethod(_patched_write_row)
+ExcelWorkbookBridge._prepare_live_sheet = _prepare_live_sheet_without_source
+ExcelWorkbookBridge._prepare_port_sheet = _prepare_port_sheet_without_source
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = _original_build_argument_parser()
-    parser.set_defaults(poll_ms=40, excel_ms=120, history_ms=1000)
+    parser.set_defaults(poll_ms=40, excel_ms=120, history_ms=500)
     return parser
